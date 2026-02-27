@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "TxGNN"
+description = "TxGNN"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.12"
+authors = [
+  { name = "TxGNN Team", email = "kexinh@stanford.edu" }
+]
+urls = { Homepage = "https://github.com/mims-harvard/TxGNN" }
+dynamic = ["version"]
+dependencies = [
+  "goatools==1.5.2",
+  "matplotlib==3.10.8",
+  "numpy==2.4.2",
+  "pandas==3.0.0",
+  "scikit-learn==1.8.0",
+  "tqdm==4.67.3",
+]
+
+[tool.setuptools]
+include-package-data = true
+zip-safe = false
+
+[tool.setuptools.packages.find]
+exclude = ["test"]
+
+[tool.setuptools.dynamic]
+version = { attr = "txgnn.version.__version__" }
