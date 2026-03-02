@@ -20,7 +20,7 @@ from typing import FrozenSet, Optional
 
 class Credibility(int, Enum):
     """Evidence credibility level for edges."""
-    SINGLE_EVIDENCE = 0       # one paper, possibly same authors
+    SINGLE_EVIDENCE = 1       # one paper, possibly same authors
     MULTI_EVIDENCE = 2        # multiple independent evidence sources
     ESTABLISHED_FACT = 3      # curated DB, no ambiguity
 
@@ -210,7 +210,7 @@ RELATIONS: list[Relation] = [
     # ── Central dogma ───────────────────────────────────────────────────────
     Relation("gene_has_transcript",           NodeType.GENE,       NodeType.TRANSCRIPT, RelationKind.CENTRAL_DOGMA,   True,  "Transcription"),
     Relation("transcript_encodes_protein",    NodeType.TRANSCRIPT, NodeType.PROTEIN,    RelationKind.CENTRAL_DOGMA,   True,  "Translation"),
-    Relation("gene_encodes_protein",          NodeType.GENE,       NodeType.PROTEIN,    RelationKind.CENTRAL_DOGMA,   True,  "Shortcut edge"),
+    Relation("gene_encodes_protein",          NodeType.GENE,       NodeType.PROTEIN,    RelationKind.CENTRAL_DOGMA,   False,  "Shortcut edge"),
     Relation("transcript_alternative_transcript", NodeType.TRANSCRIPT, NodeType.TRANSCRIPT, RelationKind.CENTRAL_DOGMA, True, "Alternative splicing"),
 
     # ── Genetic ─────────────────────────────────────────────────────────────
@@ -222,10 +222,10 @@ RELATIONS: list[Relation] = [
     Relation("mutation_causes_phenotype",           NodeType.MUTATION, NodeType.PHENOTYPE, RelationKind.GENETIC,    False, "Mendelian / GWAS"),
     Relation("mutation_affects_molecule_response",  NodeType.MUTATION, NodeType.MOLECULE,  RelationKind.PHARMACOLOGICAL, False, "Pharmacogenomics"),
     Relation("mutation_associated_cell_type",       NodeType.MUTATION, NodeType.CELL_TYPE, RelationKind.GENETIC,    False, "eQTL cell-type enrichment"),
-    Relation("gene_ortholog_gene",                  NodeType.GENE,     NodeType.GENE,      RelationKind.GENETIC,    True,  "Cross-species orthology"),
+    Relation("gene_ortholog_gene",                  NodeType.GENE,     NodeType.GENE,      RelationKind.GENETIC,    False,  "Cross-species orthology"),
 
     # ── Regulatory ──────────────────────────────────────────────────────────
-    Relation("enhancer_regulates_gene",         NodeType.ENHANCER,   NodeType.GENE,      RelationKind.REGULATORY,  True, "ChIP-seq / Hi-C"),
+    Relation("enhancer_regulates_gene",         NodeType.ENHANCER,   NodeType.GENE,      RelationKind.REGULATORY,  False, "ChIP-seq / Hi-C"),
     Relation("enhancer_regulates_transcript",   NodeType.ENHANCER,   NodeType.TRANSCRIPT,RelationKind.REGULATORY,  True, "TSS-specific regulation"),
     Relation("enhancer_active_in_cell_type",    NodeType.ENHANCER,   NodeType.CELL_TYPE, RelationKind.REGULATORY,  True, "ATAC-seq / ChIP-seq"),
     Relation("enhancer_active_in_tissue",       NodeType.ENHANCER,   NodeType.TISSUE,    RelationKind.REGULATORY,  True, "Bulk ATAC / DNase-seq"),
@@ -343,7 +343,7 @@ EDGE_PARQUET_COLUMNS: list[tuple[str, str]] = [
     ("relation",          "str  — canonical Relation.name"),
     ("display_relation",  "str  — human-readable label"),
     ("source",            "str  — database / dataset the edge came from"),
-    ("credibility",       "int  — 0 | 2 | 3 (Credibility enum value)"),
+    ("credibility",       "int  — 1 | 2 | 3 (Credibility enum value)"),
 ]
 
 

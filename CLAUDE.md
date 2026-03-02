@@ -126,7 +126,7 @@ source, credibility, [additional metadata columns…]
 | ----- | ------------------------------------------------------------------ |
 | `3`   | Established fact (curated DB, no ambiguity)                        |
 | `2`   | Multiple independent evidence (papers from distinct author groups) |
-| `0`   | Single evidence (one paper, possibly same authors)                 |
+| `1`   | Single evidence (one paper, possibly same authors)                 |
 
 ### Relation Types
 
@@ -157,7 +157,7 @@ source, credibility, [additional metadata columns…]
 | ------------------------------------ | ---------- | ---------- | --------------- | ------- | -------------------------- |
 | `gene_has_transcript`                | gene       | transcript | central_dogma   | ✓       | Transcription              |
 | `transcript_encodes_protein`         | transcript | protein    | central_dogma   | ✓       | Translation                |
-| `gene_encodes_protein`               | gene       | protein    | central_dogma   | ✓       | Shortcut edge              |
+| `gene_encodes_protein`               | gene       | protein    | central_dogma   | ✗       | Shortcut edge              |
 | `mutation_in_gene`                   | mutation   | gene       | genetic         | ✓       | Genomic position           |
 | `mutation_affects_transcript`        | mutation   | transcript | genetic         | ✓       | Splicing / UTR variant     |
 | `mutation_causes_protein_change`     | mutation   | protein    | genetic         | ✓       | Amino acid change          |
@@ -237,6 +237,7 @@ source, credibility, [additional metadata columns…]
 - **LaminDB**: node registry, ontology resolution, artifact versioning
 - **Parquet**: one file (or directory) per edge type; node feature tables
 - **bionty**: ontology resolution for Gene, Disease, Pathway, CellType, etc.
+- **pertdb**: management of perturbations, and molecules
 
 ### Graph Export
 
@@ -257,20 +258,21 @@ hetero_dgl  = kg.to_dgl()   # DGL HeteroGraph (legacy)
 
 ## Build Plan
 
-### Phase 1 — Schema & ontology design ✅ (in progress)
+### Phase 1 — Schema & ontology design ✅ (complete)
 
 - [x] Node types + ontology namespaces defined
 - [x] Full relation taxonomy with kind + direct flags
-- [ ] Cross-reference / alias tables (EFO↔MONDO↔HP, Ensembl↔UniProt…)
-- [ ] `txgnn/kg_schema.py` — Python schema as single source of truth
+- [x] Cross-reference / alias tables (EFO↔MONDO↔HP, Ensembl↔UniProt…)
+- [x] `txgnn/kg_schema.py` — Python schema as single source of truth
 
 ### Phase 2 — LaminDB schema
 
 - [x] Set up `bionty` registries (Gene, Disease, Pathway, CellType, Tissue,
       Phenotype, Organism)
-- [ ] Define custom `Record` types for Paper, Transcript, Enhancer, Dataset,
-      Mutation, CellLine
-- [ ] Register ontology source versions for reproducibility
+- [x] Define custom `Record` types for Paper, Transcript, Enhancer, Dataset,
+      Mutation (`lnschema_txgnn`; CellLine already covered by `bionty`)
+- [x] Register ontology source versions for reproducibility
+      (`reproduce/register_ontology_sources.py`)
 
 ### Phase 3 — TxGNN KG migration
 
