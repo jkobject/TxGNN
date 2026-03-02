@@ -373,37 +373,10 @@ XREF_MAPPINGS: list[XrefMapping] = [
     ),
     XrefMapping(
         from_namespace="Ensembl Gene ID",
-        to_namespace="NCBI Gene ID",
-        node_type=NodeType.GENE,
-        description="Ensembl → NCBI Gene via Ensembl xrefs endpoint",
-        url_template="https://rest.ensembl.org/xrefs/id/{id}?content-type=application/json&external_db=EntrezGene",
-    ),
-    XrefMapping(
-        from_namespace="Ensembl Gene ID",
         to_namespace="UniProt accession",
         node_type=NodeType.GENE,
         description="Ensembl Gene → canonical UniProt (swissprot) via Ensembl BioMart",
         url_template="https://rest.ensembl.org/xrefs/id/{id}?content-type=application/json&external_db=Uniprot/SWISSPROT",
-    ),
-    XrefMapping(
-        from_namespace="UniProt accession",
-        to_namespace="Ensembl Gene ID",
-        node_type=NodeType.PROTEIN,
-        description="UniProt → Ensembl Gene via UniProt ID mapping API",
-        url_template="https://rest.uniprot.org/idmapping/run",
-    ),
-    XrefMapping(
-        from_namespace="Gene symbol",
-        to_namespace="Ensembl Gene ID",
-        node_type=NodeType.GENE,
-        description="HGNC symbol → Ensembl Gene via bionty / MyGene.info",
-        url_template="https://mygene.info/v3/query?q=symbol:{id}&species=human&fields=ensembl.gene",
-    ),
-    XrefMapping(
-        from_namespace="NCBI Gene ID",
-        to_namespace="UniProt accession",
-        node_type=NodeType.PROTEIN,
-        description="NCBI Gene → UniProt via UniProt ID mapping (GeneID→UniProtKB-AC)",
     ),
 
     # ── Disease ───────────────────────────────────────────────────────────
@@ -413,13 +386,6 @@ XREF_MAPPINGS: list[XrefMapping] = [
         node_type=NodeType.DISEASE,
         description="EFO disease → MONDO via OXO cross-reference service or OBO mapping",
         url_template="https://www.ebi.ac.uk/spot/oxo/api/mappings?fromId={id}&toDb=MONDO",
-    ),
-    XrefMapping(
-        from_namespace="MONDO",
-        to_namespace="EFO",
-        node_type=NodeType.DISEASE,
-        description="MONDO → EFO via OXO / BioPortal mappings",
-        url_template="https://www.ebi.ac.uk/spot/oxo/api/mappings?fromId={id}&toDb=EFO",
     ),
     XrefMapping(
         from_namespace="OMIM",
@@ -501,14 +467,6 @@ XREF_MAPPINGS: list[XrefMapping] = [
         to_namespace="ChEMBL ID",
         node_type=NodeType.MOLECULE,
         description="CAS Registry Number → ChEMBL via UniChem",
-    ),
-
-    # ── Cell type ─────────────────────────────────────────────────────────
-    XrefMapping(
-        from_namespace="CL",
-        to_namespace="UBERON",
-        node_type=NodeType.CELL_TYPE,
-        description="Cell Ontology CL → UBERON tissue (cell type found in tissue, via CL axioms)",
     ),
 
     # ── Tissue ────────────────────────────────────────────────────────────
