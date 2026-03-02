@@ -304,7 +304,7 @@ Priority datasets:
 ### Phase 6 — Edge credibility pipeline
 
 - `score_credibility(source, evidence_list) -> int`
-- Curated DB → 3; ≥2 independent author groups → 2; single source → 0
+- Curated DB → 3; ≥2 independent author groups → 2; single source → 1
 
 ### Phase 7 — Parquet storage layout
 
