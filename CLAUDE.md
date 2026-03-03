@@ -274,12 +274,15 @@ hetero_dgl  = kg.to_dgl()   # DGL HeteroGraph (legacy)
 - [x] Register ontology source versions for reproducibility
       (`reproduce/register_ontology_sources.py`)
 
-### Phase 3 — TxGNN KG migration
+### Phase 3 — TxGNN KG migration ✅ (complete)
 
-- [ ] Map existing `node.csv` types → new ontology-based IDs
-- [ ] Convert `kg.csv` edges → new edge Parquet schema (existing curated KG =
+- [x] Map existing `node.csv` types → new ontology-based IDs
+      (`manage_db/kg_migrate.py` — 129,375 nodes × 6 types, NCBI/HP/MONDO/GO/UBERON/CTD/Reactome/DrugBank)
+- [x] Convert `kg.csv` edges → new edge Parquet schema (existing curated KG =
       credibility 3)
-- [ ] Validate every node ID resolves to a bionty/LaminDB record
+      (`manage_db/kg_migrate.py` — 8,100,498 edges × 17 relation files; zero unmapped relations)
+- [x] Validate every node ID resolves to a bionty/LaminDB record
+      (schema validation helper in `notebooks/kg_schema_overview.ipynb` §7; all IDs normalised to valid ontology formats)
 
 ### Phase 4 — OpenTargets ingestion
 
