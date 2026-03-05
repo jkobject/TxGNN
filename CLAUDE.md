@@ -274,37 +274,64 @@ hetero_dgl  = kg.to_dgl()   # DGL HeteroGraph (legacy)
 - [x] Register ontology source versions for reproducibility
       (`reproduce/register_ontology_sources.py`)
 
-### Phase 3 — TxGNN KG migration
+### Phase 3 — TxGNN KG migration ✅ (complete)
 
-- [ ] Map existing `node.csv` types → new ontology-based IDs
-- [ ] Convert `kg.csv` edges → new edge Parquet schema (existing curated KG =
-      credibility 3)
-- [ ] Validate every node ID resolves to a bionty/LaminDB record
+- [x] Map existing `node.csv` types → new ontology-based IDs
+      (`manage_db/kg_migrate.py` — 129,375 nodes × 6 types)
+- [x] Convert `kg.csv` edges → new edge Parquet schema (existing curated KG =
+      credibility 3) (`manage_db/kg_migrate.py` — 8,100,498 edges × 17 relation files)
+- [x] Validate every node ID resolves to a bionty/LaminDB record
 
-### Phase 4 — OpenTargets ingestion
+### Phase 4 — OpenTargets ingestion ✅ (complete)
 
-Priority datasets:
+All functions in `manage_db/ingest_opentargets.py`, tested end-to-end:
 
-- `target` → gene/protein nodes
-- `disease` → disease nodes (EFO/MONDO)
-- `evidence/*` → edges with credibility scoring from `datatypeId` + `score`
-- `drug` → molecule nodes (ChEMBL)
-- `interaction` → protein–protein edges
-- `reactome` / `go` → pathway nodes + gene↔pathway edges
-- `literature` → paper nodes + NLP mentions
+- [x] `ingest_targets` → 78,725 gene nodes
+- [x] `ingest_diseases` → 46,960 disease nodes + 63,886 hierarchy edges
+- [x] `ingest_drugs` → 18,475 molecule nodes
+- [x] `ingest_interactions` → ~12.7M protein–protein edges (per-chunk flush)
+- [x] `ingest_evidence` → disease_associated_gene, molecule_treats_disease,
+      disease_involves_pathway edges (per-chunk flush, all evidence_* dirs)
+- [x] `ingest_go` → 17,891 GO pathway nodes + 755,796 gene-GO edges
+- [x] `ingest_reactome` → 2,825 Reactome pathway nodes + 2,841 hierarchy edges
+- [x] `ingest_indication` → 76,520 approved indication edges
+- [x] `ingest_mechanism_of_action` → 15,363 drug-target edges
+- [x] `ingest_literature` → paper nodes + paper_mentions_gene/disease edges
+      (per-chunk flush over 23.3M europepmc rows)
 
-### Phase 5 — Additional sources
+### Phase 5 — Additional sources (from OpenTargets local data) ✅ (complete)
 
-- Mutations: ClinVar, gnomAD → mutation nodes + edges
-- Transcripts: Ensembl BioMart → transcript nodes
-- Cell types: CellxGene census → expression edges
-- Enhancers: ENCODE / Ensembl Regulatory → enhancer nodes
-- Papers: PubMed (via OpenTargets literature) → paper nodes
+All data already downloaded to `data/opentargets/` — no external sources needed.
+Functions in `manage_db/ingest_opentargets.py`:
 
-### Phase 6 — Edge credibility pipeline
+- [x] `ingest_disease_phenotype`: 137,411 `disease_has_phenotype` edges
+- [x] `ingest_expression`: 3,311,510 `tissue_expresses_gene` + 1,353,553 `cell_type_expresses_gene` edges
+- [x] `ingest_biosample`: 3,499 cell_type + 16,054 tissue nodes
+- [x] `ingest_pharmacogenomics`: 4,837 `mutation_affects_molecule_response` edges
+- [x] `ingest_variants`: mutation nodes + `mutation_in_gene`, `mutation_affects_transcript`,
+      `mutation_causes_protein_change` edges (vectorized `explode`+`json_normalize`);
+      smoke-tested (1/25 files: 293,918 mutations, 10,868,328 gene edges);
+      ⚠️ full run requires ~20GB RAM, ~4 hours — run on a server with sufficient memory
+- [x] `ingest_enhancers`: enhancer nodes + `enhancer_regulates_gene`, `enhancer_active_in_tissue`,
+      `enhancer_active_in_cell_type` edges (vectorized, `pd.cut` credibility);
+      smoke-tested (1/83 files: 597,831 enhancers, 597,831 gene edges)
+- [x] Papers: done via OpenTargets europepmc in Phase 4 literature
 
-- `score_credibility(source, evidence_list) -> int`
-- Curated DB → 3; ≥2 independent author groups → 2; single source → 1
+### Phase 6 — Edge credibility pipeline ⚠️ (partial — NOT complete)
+
+- [~] `_credibility_from_score(score, dtype) -> int` defined in
+      `ingest_opentargets.py` but **never tested end-to-end**
+- [ ] Needs handling of **composed edges** (A→C→B path vs A→B direct) where
+      evidence through an intermediary node should count differently than
+      a direct edge with multiple independent sources
+- [ ] Multi-source author-independence check: credibility 2 requires ≥2
+      independent author groups (different labs/institutions), not just
+      2 papers from the same group
+- [ ] Deduplication across sources: if the same evidence is present in multiple
+      datasets (e.g. a drug-target interaction from both OpenTargets and DrugBank),
+      it should only count once toward credibility scoring
+- [ ] Full `score_credibility(source, evidence_list) -> int` pipeline with
+      edge-composition logic and proper deduplication across composed paths
 
 ### Phase 7 — Parquet storage layout
 
