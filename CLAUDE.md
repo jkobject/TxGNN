@@ -53,6 +53,12 @@ TxEval.eval_disease_centric(disease_idxs='test_set', ...)
 - No JupyterLab installed (only nbconvert/nbformat in venv)
 - No web server — this is a pure research library
 
+## lamindb
+
+the lamin instance for this is jkobject/jouvencekb and requires authentication
+from jkobject and a gsutil command access setup with the jkobject project id
+jkobject-1549353370965
+
 ## Data
 
 - Knowledge graph CSVs: `data/kg.csv`, `node.csv`, `edges.csv` (Harvard

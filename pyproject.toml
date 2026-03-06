@@ -7,16 +7,20 @@ name = "TxGNN"
 description = "TxGNN"
 readme = "README.md"
 license = { text = "MIT" }
-requires-python = ">=3.12"
+requires-python = ">=3.11"
 authors = [
   { name = "TxGNN Team", email = "kexinh@stanford.edu" }
 ]
 urls = { Homepage = "https://github.com/mims-harvard/TxGNN" }
 dynamic = ["version"]
 dependencies = [
+  "gcsfs>=2024.6.1",
   "goatools==1.5.2",
+  "lamindb==2.2.1",
+  "lnschema-txgnn",
   "matplotlib==3.10.8",
   "numpy==2.4.2",
+  "ipython==7.2.0",
   "pandas==3.0.0",
   "scikit-learn==1.8.0",
   "tqdm==4.67.3",
@@ -31,3 +35,16 @@ exclude = ["test"]
 
 [tool.setuptools.dynamic]
 version = { attr = "txgnn.version.__version__" }
+
+# uv workspace — lnschema_txgnn is a separate installable sub-package.
+# `uv sync` will install it in editable mode automatically.
+[tool.uv.workspace]
+members = ["manage_db/lnschema_txgnn"]
+
+[tool.uv]
+# lamindb 2.2.x declares pandas<3.0.0, but pandas 3.0 is actually compatible.
+# Force our pinned version regardless of that upstream metadata constraint.
+override-dependencies = ["pandas==3.0.0"]
+
+[tool.uv.sources]
+lnschema-txgnn = { workspace = true }

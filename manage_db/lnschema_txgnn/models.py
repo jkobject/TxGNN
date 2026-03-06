@@ -18,6 +18,7 @@ if you need to store the xref columns in a custom table.
 from __future__ import annotations
 
 from lamindb.base.fields import BooleanField, CharField, IntegerField, TextField
+from lamindb.base.uids import base62_12
 from lamindb.models import SQLRecord, TracksRun, TracksUpdates
 
 
@@ -36,6 +37,11 @@ class Paper(SQLRecord, TracksRun, TracksUpdates):
     class Meta(SQLRecord.Meta, TracksRun.Meta, TracksUpdates.Meta):
         abstract = False
         app_label = "lnschema_txgnn"
+
+    uid: str = CharField(
+        max_length=12, editable=False, unique=True, db_index=True, default=base62_12
+    )
+    """Universal id, generated automatically."""
 
     # Primary identifier
     pmid: str | None = CharField(max_length=32, null=True, db_index=True, unique=True)
@@ -72,6 +78,11 @@ class Transcript(SQLRecord, TracksRun, TracksUpdates):
         abstract = False
         app_label = "lnschema_txgnn"
 
+    uid: str = CharField(
+        max_length=12, editable=False, unique=True, db_index=True, default=base62_12
+    )
+    """Universal id, generated automatically."""
+
     # Primary identifier
     ensembl_transcript_id: str = CharField(max_length=64, db_index=True, unique=True)
     """Ensembl transcript ID (e.g., ``"ENST00000000233"``). Primary identifier."""
@@ -103,6 +114,11 @@ class Enhancer(SQLRecord, TracksRun, TracksUpdates):
         abstract = False
         app_label = "lnschema_txgnn"
 
+    uid: str = CharField(
+        max_length=12, editable=False, unique=True, db_index=True, default=base62_12
+    )
+    """Universal id, generated automatically."""
+
     # Primary identifier
     encode_id: str | None = CharField(max_length=64, null=True, db_index=True, unique=True)
     """ENCODE enhancer element ID (e.g., ``"EH38E1516972"``). Primary identifier."""
@@ -133,6 +149,11 @@ class Dataset(SQLRecord, TracksRun, TracksUpdates):
         abstract = False
         app_label = "lnschema_txgnn"
 
+    uid: str = CharField(
+        max_length=12, editable=False, unique=True, db_index=True, default=base62_12
+    )
+    """Universal id, generated automatically."""
+
     name: str = CharField(max_length=512, db_index=True)
     """Human-readable dataset name."""
     doi: str | None = CharField(max_length=255, null=True, db_index=True)
@@ -156,6 +177,11 @@ class Mutation(SQLRecord, TracksRun, TracksUpdates):
     class Meta(SQLRecord.Meta, TracksRun.Meta, TracksUpdates.Meta):
         abstract = False
         app_label = "lnschema_txgnn"
+
+    uid: str = CharField(
+        max_length=12, editable=False, unique=True, db_index=True, default=base62_12
+    )
+    """Universal id, generated automatically."""
 
     # Primary identifier
     rsid: str | None = CharField(max_length=32, null=True, db_index=True, unique=True)

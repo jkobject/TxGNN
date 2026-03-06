@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lnschema-txgnn"
+version = "0.1.0"
+description = "Custom LaminDB schema for TxGNN — paper, transcript, enhancer, dataset, mutation registries"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+authors = [
+  { name = "TxGNN Team", email = "kexinh@stanford.edu" },
+]
+# lamindb is required at runtime but provided by the parent TxGNN workspace
+# environment.  Declaring it here as a hard dep causes a version conflict
+# (lamindb<2.3 pins pandas<3 while TxGNN pins pandas==3.0.0).
+# Install it separately: `uv pip install "lamindb==2.2.1"`
+dependencies = []
+
+[tool.setuptools.packages.find]
+# The pyproject.toml lives INSIDE the package folder (manage_db/lnschema_txgnn/).
+# Look one level up (manage_db/) so setuptools discovers lnschema_txgnn/ there.
+where = [".."]
+include = ["lnschema_txgnn*"]
+
+[tool.setuptools.package-data]
+lnschema_txgnn = ["migrations/*.py"]
