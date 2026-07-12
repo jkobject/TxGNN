@@ -4,17 +4,20 @@ This restore source is a clean branch from `a70bb42775afbfb06544c9326dd1c8179c4a
 
 ## Included source and provenance
 
-The branch contains the previously accepted exact-model activation patch plus the sync implementation and its direct source dependency:
+The branch contains the committed exact-model activation sources, the bounded sync implementation, and their direct test/dependency sources. No external patch artifact is required or included.
 
 | Path | SHA-256 | Provenance |
 | --- | --- | --- |
 | `manage_db/kg_edge_pilot.py` | `ab08685fb095b1a8131a71728a78037a3f237aa0ef9c0ffc3114a5fa30d126fc` | committed remote source `f34ae04bf49ebda88f14cc6fdc3e5eecbce11ff2`; accepted-source cache |
-| `manage_db/sync_parquet_edges_to_lamindb.py` | `30c485923912cc86a303d698c0ae1617e34ae1363a38cf96fccf6f311c61e738` | staged `t_a9bd79f6` review source, derived from the accepted isolated source; implements bounded single-pass streaming, fsynced telemetry, selected-key verification, and the accepted writer-capability guard |
-| `tests/test_sync_parquet_edges_to_lamindb.py` | `68f10c53bce5a5fb381160ec8e58226e78f667080fa84007677d4a1985ac62df` | matching staged `t_a9bd79f6` focused test source |
+| `manage_db/sync_parquet_edges_to_lamindb.py` | `23a4ca76f6d71c4000a78dc725c6d62d34d1e76f2bfb0f4315d8d1ce8967f160` | scoped per-guard writer capability: identity-checked against the active owner-thread scope and revoked before lock release |
+| `tests/test_sync_parquet_edges_to_lamindb.py` | `5bd0e1269a3480564fc002951e56445f2dce235897730dbb417aaac110e38489` | focused streaming/sync tests, including stale, forged, later-scope, and cross-thread capability rejection before write machinery |
 | `manage_db/kg_storage.py` | `430513f32fd3bc7421bd12011e8710b37974daa7cf43e03a4643d884399919cf` | already present and unchanged in documented base `a70bb42` |
-| `artifacts/staged/t_c432d85d/lamin_exact_kg_models.patch` | `da8bcd0b30f343f2b8f00b518003cf370da037ecc9bdeb2399d660dca00e5d20` | accepted `KGEdge`/`KGEdgeEvidence` activation and writer-capability safety patch |
+| `manage_db/lnschema_txgnn/__init__.py` | `450d45ce48e4271f5e72445321df568e8bbdbf4b2c3c88297bd165608b8bef3d` | committed exact-model application configuration |
+| `manage_db/lnschema_txgnn/models.py` | `b4d31674456182667d2043814f9b103822d370db63438c82dae3ae6aa791158e` | committed `KGEdge` and `KGEdgeEvidence` model activation source |
+| `manage_db/lnschema_txgnn/migrations/0007_generic_kg_edge_evidence.py` | `e901e435d57c8dca36645fca7423f3abdf31f8a9680083c7d6d4f1be06156f17` | committed exact-model migration; schema-only and does not sync KG rows or write GCS |
+| `tests/test_lnschema_txgnn_exact_kg_models.py` | `827091de01ed835604c43cd76e1b4aedd5174511b3fde37abb161f7baca4e984` | exact-model activation regression coverage |
 
-The four source-path hashes above must be checked after applying this branch/patch. This documents `kg_storage` as a pinned base dependency rather than duplicating an unchanged base file in the patch. The prior cached sync file and a later remote source/test pair did not preserve the accepted writer-capability contract, so neither is used here.
+The eight source-path hashes above must be checked after applying this branch. This documents `kg_storage` as a pinned base dependency rather than duplicating an unchanged base file. The prior cached sync file and a later remote source/test pair did not preserve the active-scope writer-capability contract, so neither is used here.
 
 ## Restore and pre-write gate
 

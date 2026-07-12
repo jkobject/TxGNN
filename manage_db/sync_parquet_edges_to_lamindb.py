@@ -12,6 +12,7 @@ import hashlib
 import json
 import os
 import tempfile
+import threading
 from dataclasses import asdict, dataclass, field
 from itertools import zip_longest
 from pathlib import Path
@@ -97,12 +98,32 @@ class _VerificationError(RuntimeError):
     pass
 
 
-_INTERNAL_WRITER_TOKEN = object()
+@dataclass(frozen=True)
+class _WriterCapability:
+    """Unforgeable-by-identity capability valid only in its owning guard scope."""
+
+    lamin_instance: str
+    owner_thread: int
+
+
+_writer_capability_state_lock = threading.Lock()
+_active_writer_capability: _WriterCapability | None = None
+
+
+def _has_active_writer_capability(token: object | None) -> bool:
+    """Accept only the capability issued to the currently active guard scope."""
+    with _writer_capability_state_lock:
+        return (
+            isinstance(token, _WriterCapability)
+            and token is _active_writer_capability
+            and token.owner_thread == threading.get_ident()
+        )
 
 
 @contextlib.contextmanager
 def _single_writer_guard(lamin_instance: str) -> Iterator[object]:
     """Acquire a host-global lock keyed solely by the target Lamin instance."""
+    global _active_writer_capability
     if lamin_instance != _EXPECTED_INSTANCE:
         raise ValueError(f"expected exact Lamin instance {_EXPECTED_INSTANCE!r}, got {lamin_instance!r}")
     try:
@@ -112,14 +133,27 @@ def _single_writer_guard(lamin_instance: str) -> Iterator[object]:
     digest = hashlib.sha256(lamin_instance.encode()).hexdigest()[:20]
     path = Path(tempfile.gettempdir()) / f"txgnn-lamindb-{digest}.lock"
     handle = path.open("a+")
+    capability = _WriterCapability(lamin_instance=lamin_instance, owner_thread=threading.get_ident())
+    capability_activated = False
     try:
         try:
             fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError as exc:
             raise RuntimeError(f"another writer holds the global Lamin sync lock for {lamin_instance}") from exc
-        yield _INTERNAL_WRITER_TOKEN
+        with _writer_capability_state_lock:
+            if _active_writer_capability is not None:
+                raise RuntimeError("another writer capability is already active in this process")
+            _active_writer_capability = capability
+            capability_activated = True
+        yield capability
     finally:
         try:
+            # Revoke the capability while the lock is still held so a retained
+            # object cannot authorize a later write after scope exit.
+            if capability_activated:
+                with _writer_capability_state_lock:
+                    if _active_writer_capability is capability:
+                        _active_writer_capability = None
             fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
         finally:
             handle.close()
@@ -318,8 +352,8 @@ def _append_telemetry(path: Path, payload: Mapping[str, Any]) -> None:
 def _sync_relation_pass(*, kg_root: str | Path, window: RelationWindow, write: bool, resume_chunk: int, max_chunks: int | None, batch_size: int, verify_selected_live: bool, telemetry_path: Path | None, _token: object | None = None) -> LiveEdgeSyncSummary:
     if resume_chunk < 0:
         raise ValueError("resume_chunk must be >= 0")
-    if write and (not verify_selected_live or _token is not _INTERNAL_WRITER_TOKEN):
-        raise RuntimeError("fail closed: writes require selected-live verification and an internal writer capability")
+    if write and (not verify_selected_live or not _has_active_writer_capability(_token)):
+        raise RuntimeError("fail closed: writes require selected-live verification and an active writer capability")
     _, edge_total = _parquet_metadata(kg_root, "edges", window.relation)
     _, evidence_total = _parquet_metadata(kg_root, "evidence", window.relation)
     summary = LiveEdgeSyncSummary(relation=window.relation, edge_offset=window.edge_offset, edge_limit=window.edge_limit, evidence_offset=window.evidence_offset, evidence_limit=window.evidence_limit, chunk_size=window.chunk_size, resume_chunk=resume_chunk, max_chunks=max_chunks, edge_rows_available=edge_total, evidence_rows_available=evidence_total, edge_rows_selected=_selected_count(edge_total, window.edge_offset, window.edge_limit), evidence_rows_selected=_selected_count(evidence_total, window.evidence_offset, window.evidence_limit))

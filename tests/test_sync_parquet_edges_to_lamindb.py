@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -128,6 +129,78 @@ def test_direct_api_cannot_bypass_global_lock_with_other_telemetry_path(tmp_path
         with pytest.raises(RuntimeError, match="global Lamin sync lock"):
             sync.sync_relation_to_lamindb(kg_root=tmp_path, relation=REL, edge_limit=1, evidence_limit=1, write=True, verify_selected_live=True, telemetry_path=tmp_path / "other.jsonl")
     assert called is False
+
+
+def _direct_write_kwargs(tmp_path: Path) -> dict[str, Any]:
+    return {
+        "kg_root": tmp_path,
+        "window": sync.RelationWindow(REL, edge_limit=1, evidence_limit=1, chunk_size=1),
+        "write": True,
+        "resume_chunk": 0,
+        "max_chunks": None,
+        "batch_size": 1,
+        "verify_selected_live": True,
+        "telemetry_path": None,
+    }
+
+
+def _assert_capability_rejected_before_write_machinery(tmp_path: Path, monkeypatch, token: object) -> None:
+    def no_write_machinery(*args: Any, **kwargs: Any) -> None:
+        raise AssertionError("stale or forged capability reached write machinery")
+
+    monkeypatch.setattr(sync, "_parquet_metadata", no_write_machinery)
+    with pytest.raises(RuntimeError, match="active writer capability"):
+        sync._sync_relation_with_token(
+            lamin_instance="jkobject/jouvencekb",
+            token=token,
+            **_direct_write_kwargs(tmp_path),
+        )
+
+
+def test_stale_writer_capability_is_rejected_before_write_machinery(tmp_path: Path, monkeypatch) -> None:
+    with sync._single_writer_guard("jkobject/jouvencekb") as stale_token:
+        pass
+    _assert_capability_rejected_before_write_machinery(tmp_path, monkeypatch, stale_token)
+
+
+def test_forged_writer_capability_is_rejected_before_write_machinery(tmp_path: Path, monkeypatch) -> None:
+    with sync._single_writer_guard("jkobject/jouvencekb"):
+        _assert_capability_rejected_before_write_machinery(tmp_path, monkeypatch, object())
+
+
+def test_writer_capability_cannot_be_reused_by_a_later_guard_scope(tmp_path: Path, monkeypatch) -> None:
+    with sync._single_writer_guard("jkobject/jouvencekb") as prior_token:
+        pass
+    with sync._single_writer_guard("jkobject/jouvencekb") as current_token:
+        assert current_token is not prior_token
+        _assert_capability_rejected_before_write_machinery(tmp_path, monkeypatch, prior_token)
+
+
+def test_writer_capability_cannot_be_used_from_another_thread_before_write_machinery(tmp_path: Path, monkeypatch) -> None:
+    failures: list[BaseException] = []
+
+    def no_write_machinery(*args: Any, **kwargs: Any) -> None:
+        raise AssertionError("cross-thread capability reached write machinery")
+
+    monkeypatch.setattr(sync, "_parquet_metadata", no_write_machinery)
+    with sync._single_writer_guard("jkobject/jouvencekb") as token:
+        def attempt_cross_thread_write() -> None:
+            try:
+                sync._sync_relation_with_token(
+                    lamin_instance="jkobject/jouvencekb",
+                    token=token,
+                    **_direct_write_kwargs(tmp_path),
+                )
+            except BaseException as exc:
+                failures.append(exc)
+
+        worker = threading.Thread(target=attempt_cross_thread_write)
+        worker.start()
+        worker.join()
+
+    assert len(failures) == 1
+    assert isinstance(failures[0], RuntimeError)
+    assert "active writer capability" in str(failures[0])
 
 
 def test_registry_models_fails_closed_without_activated_registry(monkeypatch) -> None:
