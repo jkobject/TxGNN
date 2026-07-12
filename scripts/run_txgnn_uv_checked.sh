@@ -15,6 +15,14 @@ if [[ ! -x "$uv_bin" ]]; then
   exit 127
 fi
 
+user_local_root=$(cd "$HOME/.local" && pwd -P)
+uv_real=$(cd "$(dirname "$uv_bin")" && pwd -P)/$(basename "$uv_bin")
+uv_real=$(realpath "$uv_real")
+case "$uv_real" in
+  "$user_local_root"/*) ;;
+  *) printf 'TXGNN_UV must resolve within the user-local root %s, got %s\n' "$user_local_root" "$uv_real" >&2; exit 64 ;;
+esac
+
 actual_commit=$(git rev-parse HEAD)
 if [[ "$actual_commit" != "$expected_commit" ]]; then
   printf 'checked checkout mismatch: expected=%s actual=%s\n' "$expected_commit" "$actual_commit" >&2
@@ -22,10 +30,10 @@ if [[ "$actual_commit" != "$expected_commit" ]]; then
 fi
 
 if command -v sha256sum >/dev/null 2>&1; then
-  uv_sha256=$(sha256sum "$uv_bin" | cut -d' ' -f1)
+  uv_sha256=$(sha256sum "$uv_real" | cut -d' ' -f1)
 else
-  uv_sha256=$(shasum -a 256 "$uv_bin" | cut -d' ' -f1)
+  uv_sha256=$(shasum -a 256 "$uv_real" | cut -d' ' -f1)
 fi
-printf 'TXGNN_UV_PATH=%s\nTXGNN_UV_SHA256=%s\nTXGNN_CHECKOUT_HEAD=%s\n' "$uv_bin" "$uv_sha256" "$actual_commit"
-"$uv_bin" --version
-exec "$uv_bin" run "$@"
+printf 'TXGNN_UV_PATH=%s\nTXGNN_UV_SHA256=%s\nTXGNN_CHECKOUT_HEAD=%s\n' "$uv_real" "$uv_sha256" "$actual_commit"
+"$uv_real" --version
+exec "$uv_real" run "$@"

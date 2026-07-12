@@ -3,6 +3,7 @@ from __future__ import annotations
 import contextlib
 import json
 import os
+import subprocess
 import threading
 from pathlib import Path
 from typing import Any
@@ -133,11 +134,22 @@ def test_durable_telemetry_ack_follows_fsync_and_binds_record_identity(tmp_path:
         events.append("fsync")
         original_fsync(fd)
 
+    original_replace = os.replace
+    def recording_replace(source, target) -> None:
+        events.append("replace")
+        original_replace(source, target)
+
+    def recording_directory_fsync(directory: Path) -> None:
+        assert directory == telemetry.parent
+        events.append("directory_fsync")
+
     monkeypatch.setattr(Path, "open", recording_open)
     monkeypatch.setattr(sync.os, "fsync", recording_fsync)
+    monkeypatch.setattr(sync.os, "replace", recording_replace)
+    monkeypatch.setattr(sync, "_fsync_directory", recording_directory_fsync)
     ack = sync._append_durable_telemetry(telemetry, {"run_id": "run-1", "record_id": "record-1", "relation": REL})
 
-    assert events == ["write", "flush", "fsync", "write", "flush", "fsync"]
+    assert events == ["write", "flush", "fsync", "write", "flush", "fsync", "replace", "directory_fsync"]
     assert ack["fsync_success"] is True
     assert ack["record_id"] == "record-1"
     assert ack["telemetry_path"] == str(telemetry.resolve())
@@ -146,6 +158,26 @@ def test_durable_telemetry_ack_follows_fsync_and_binds_record_identity(tmp_path:
     assert ack["record_sha256"] == payload["record_sha256"]
     ack_path = telemetry.with_suffix(".jsonl.ack.jsonl")
     assert json.loads(ack_path.read_text().strip()) == ack
+
+
+def test_directory_fsync_failure_leaves_visible_ack_unaccepted_and_no_checkpoint(tmp_path: Path, monkeypatch) -> None:
+    _fixture(tmp_path)
+    _fake_lamin(monkeypatch)
+    telemetry = tmp_path / "progress.jsonl"
+
+    def fail_directory_fsync(_: Path) -> None:
+        raise OSError("directory sync failure")
+
+    monkeypatch.setattr(sync, "_fsync_directory", fail_directory_fsync)
+    result = sync.sync_relation_to_lamindb(kg_root=tmp_path, relation=REL, edge_limit=1, evidence_limit=1, chunk_size=1, write=True, verify_selected_live=True, telemetry_path=telemetry, run_id="run-directory-failure")
+
+    assert result.status == "telemetry_failed"
+    assert result.chunks == []
+    assert result.durable_edge_current_offset is None
+    assert result.durable_evidence_current_offset is None
+    # A post-replace file can be visible but is not checkpoint-eligible until
+    # the containing directory fsync succeeds.
+    assert telemetry.with_suffix(".jsonl.ack.jsonl").exists()
 
 
 def test_fsync_failure_emits_no_success_ack_and_does_not_advance_checkpoint(tmp_path: Path, monkeypatch) -> None:
@@ -231,6 +263,56 @@ def test_verified_write_requires_durable_telemetry_before_upsert(tmp_path: Path,
     with pytest.raises(RuntimeError, match="durable telemetry_path"):
         sync.sync_relation_to_lamindb(kg_root=tmp_path, relation=REL, write=True, verify_selected_live=True)
     assert Edge.objects.records == Evidence.objects.records == {}
+
+
+def test_checked_uv_launcher_rejects_system_binary_and_symlink_escape(tmp_path: Path) -> None:
+    root = Path(__file__).parents[1]
+    launcher = root / "scripts" / "run_txgnn_uv_checked.sh"
+    expected_commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip()
+    home = tmp_path / "home"
+    local_bin = home / ".local" / "bin"
+    local_bin.mkdir(parents=True)
+    fake_uv = local_bin / "uv"
+    fake_uv.write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
+    fake_uv.chmod(0o755)
+    environment = {**os.environ, "HOME": str(home), "TXGNN_EXPECTED_COMMIT": expected_commit}
+
+    system_binary = subprocess.run([str(launcher), "--version"], cwd=root, env={**environment, "TXGNN_UV": "/usr/bin/true"}, text=True, capture_output=True)
+    assert system_binary.returncode == 64
+    assert "user-local" in system_binary.stderr
+
+    escaped_uv = tmp_path / "outside-uv"
+    escaped_uv.write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
+    escaped_uv.chmod(0o755)
+    fake_uv.unlink()
+    fake_uv.symlink_to(escaped_uv)
+    symlink_escape = subprocess.run([str(launcher), "--version"], cwd=root, env=environment, text=True, capture_output=True)
+    assert symlink_escape.returncode == 64
+    assert "user-local" in symlink_escape.stderr
+
+
+def test_checked_uv_launcher_rejects_missing_binary_and_checkout_mismatch(tmp_path: Path) -> None:
+    root = Path(__file__).parents[1]
+    launcher = root / "scripts" / "run_txgnn_uv_checked.sh"
+    expected_commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip()
+    home = tmp_path / "home"
+    local_bin = home / ".local" / "bin"
+    local_bin.mkdir(parents=True)
+    environment = {**os.environ, "HOME": str(home), "TXGNN_EXPECTED_COMMIT": expected_commit}
+
+    missing_binary = subprocess.run([str(launcher), "--version"], cwd=root, env=environment, text=True, capture_output=True)
+    assert missing_binary.returncode == 127
+    assert "unavailable" in missing_binary.stderr
+
+    fake_uv = local_bin / "uv"
+    fake_uv.write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
+    fake_uv.chmod(0o755)
+    positive = subprocess.run([str(launcher), "--version"], cwd=root, env=environment, text=True, capture_output=True)
+    assert positive.returncode == 0
+    assert f"TXGNN_CHECKOUT_HEAD={expected_commit}" in positive.stdout
+    mismatch = subprocess.run([str(launcher), "--version"], cwd=root, env={**environment, "TXGNN_EXPECTED_COMMIT": "0" * 40}, text=True, capture_output=True)
+    assert mismatch.returncode == 65
+    assert "checkout mismatch" in mismatch.stderr
 
 
 def test_direct_api_cannot_bypass_global_lock_with_other_telemetry_path(tmp_path: Path, monkeypatch) -> None:

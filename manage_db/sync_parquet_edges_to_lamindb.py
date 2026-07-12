@@ -393,6 +393,16 @@ def _ack_path_for(telemetry_path: Path) -> Path:
     return telemetry_path.with_suffix(f"{telemetry_path.suffix}.ack.jsonl")
 
 
+def _fsync_directory(path: Path) -> None:
+    """Make a prior rename durable in its containing directory."""
+    flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+    directory_fd = os.open(path, flags)
+    try:
+        os.fsync(directory_fd)
+    finally:
+        os.close(directory_fd)
+
+
 def _append_durable_telemetry(path: Path, payload: Mapping[str, Any]) -> dict[str, Any]:
     """Persist a subchunk record then a separately fsynced acknowledgement.
 
@@ -434,9 +444,12 @@ def _append_durable_telemetry(path: Path, payload: Mapping[str, Any]) -> dict[st
             handle.flush()
             os.fsync(handle.fileno())
         os.replace(pending_ack_path, ack_path)
+        _fsync_directory(ack_path.parent)
     except OSError as exc:
-        # A pending file never becomes the visible acknowledgement until its
-        # fsync succeeds, so an fsync error cannot expose success evidence.
+        # Before replace, a pending file is cleaned up.  After replace, an ack
+        # can be visible but is intentionally unaccepted if the directory fsync
+        # fails; recovery must re-run selected-live verification and emit a new
+        # acknowledgement rather than treating that visible file as durable.
         pending_ack_path.unlink(missing_ok=True)
         raise _TelemetryDurabilityError(f"telemetry acknowledgement fsync failed for {ack_path.resolve()}: {exc}") from exc
     return acknowledgement
