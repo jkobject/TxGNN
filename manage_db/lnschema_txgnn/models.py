@@ -27,7 +27,7 @@ source ontology ID directly without asserting a MONDO equivalence.
 
 from __future__ import annotations
 
-from lamindb.base.fields import BooleanField, CharField, IntegerField, TextField
+from lamindb.base.fields import BooleanField, CharField, FloatField, IntegerField, JSONField, TextField
 from lamindb.base.uids import base62_12
 from lamindb.models import SQLRecord, TracksRun, TracksUpdates
 
@@ -356,6 +356,54 @@ class Mutation(SQLRecord, TracksRun, TracksUpdates):
     """Alternate allele sequence."""
     consequence: str | None = CharField(max_length=64, null=True, db_index=True)
     """Predicted molecular consequence (e.g., ``"missense_variant"``)."""
+
+
+class KGEdge(SQLRecord, TracksRun, TracksUpdates):
+    """Generic exact-ID KG edge registry."""
+
+    class Meta(SQLRecord.Meta, TracksRun.Meta, TracksUpdates.Meta):
+        abstract = False
+        app_label = "lnschema_txgnn"
+
+    uid: str = CharField(max_length=12, editable=False, unique=True, db_index=True, default=base62_12)
+    edge_key: str = CharField(max_length=255, unique=True, db_index=True)
+    x_id: str = CharField(max_length=128, db_index=True)
+    x_type: str = CharField(max_length=32, db_index=True)
+    y_id: str = CharField(max_length=128, db_index=True)
+    y_type: str = CharField(max_length=32, db_index=True)
+    relation: str = CharField(max_length=96, db_index=True)
+    display_relation: str | None = CharField(max_length=128, null=True, db_index=True)
+    source: str | None = CharField(max_length=128, null=True, db_index=True)
+    credibility: int | None = IntegerField(null=True, db_index=True)
+    metadata: dict | None = JSONField(null=True)
+
+
+class KGEdgeEvidence(SQLRecord, TracksRun, TracksUpdates):
+    """Generic support/provenance registry for KG edges."""
+
+    class Meta(SQLRecord.Meta, TracksRun.Meta, TracksUpdates.Meta):
+        abstract = False
+        app_label = "lnschema_txgnn"
+
+    uid: str = CharField(max_length=12, editable=False, unique=True, db_index=True, default=base62_12)
+    evidence_key: str = CharField(max_length=255, unique=True, db_index=True)
+    edge_key: str = CharField(max_length=255, db_index=True)
+    relation: str = CharField(max_length=96, db_index=True)
+    x_id: str = CharField(max_length=128, db_index=True)
+    x_type: str = CharField(max_length=32, db_index=True)
+    y_id: str = CharField(max_length=128, db_index=True)
+    y_type: str = CharField(max_length=32, db_index=True)
+    evidence_type: str | None = CharField(max_length=96, null=True, db_index=True)
+    source: str | None = CharField(max_length=128, null=True, db_index=True)
+    source_dataset: str | None = CharField(max_length=128, null=True, db_index=True)
+    source_record_id: str | None = CharField(max_length=255, null=True, db_index=True)
+    paper_id: str | None = CharField(max_length=64, null=True, db_index=True)
+    dataset_id: str | None = CharField(max_length=128, null=True, db_index=True)
+    study_id: str | None = CharField(max_length=255, null=True, db_index=True)
+    evidence_score: float | None = FloatField(null=True, db_index=True)
+    predicate: str | None = CharField(max_length=128, null=True, db_index=True)
+    direction: str | None = CharField(max_length=64, null=True, db_index=True)
+    metadata: dict | None = JSONField(null=True)
 
 
 # ---------------------------------------------------------------------------
