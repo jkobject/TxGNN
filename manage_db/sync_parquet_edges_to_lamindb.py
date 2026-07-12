@@ -8,11 +8,17 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+from datetime import datetime, timezone
 import hashlib
 import json
 import os
+import platform
+import resource
+import shutil
 import tempfile
 import threading
+import time
+import uuid
 from dataclasses import asdict, dataclass, field
 from itertools import zip_longest
 from pathlib import Path
@@ -50,7 +56,14 @@ class RelationWindow:
 
 @dataclass
 class LiveEdgeSyncChunk:
+    run_id: str
+    record_id: str
     relation: str
+    source_edge_offset: int
+    source_edge_limit: int
+    source_evidence_offset: int
+    source_evidence_limit: int
+    sync_pass_index: int
     chunk_index: int
     edge_offset: int
     edge_limit: int
@@ -64,6 +77,14 @@ class LiveEdgeSyncChunk:
     evidence_upserts: int = 0
     durable_edge_current_offset: int | None = None
     durable_evidence_current_offset: int | None = None
+    last_progress_at: str | None = None
+    elapsed_seconds: float | None = None
+    edge_rows_per_second: float | None = None
+    evidence_rows_per_second: float | None = None
+    process_rss_bytes: int | None = None
+    disk_free_bytes: int | None = None
+    iowait_seconds: float | None = None
+    iowait_status: str = "unavailable"
     status: str = "dry_run"
 
 
@@ -95,6 +116,10 @@ class LiveEdgeSyncSummary:
 
 
 class _VerificationError(RuntimeError):
+    pass
+
+
+class _TelemetryDurabilityError(RuntimeError):
     pass
 
 
@@ -340,16 +365,84 @@ def _verify_selected(model: Any, key_field: str, frame: pd.DataFrame, fields: Se
     return len(live), mismatches
 
 
-def _append_telemetry(path: Path, payload: Mapping[str, Any]) -> None:
+def _iowait_seconds() -> tuple[float | None, str]:
+    """Return Linux aggregate iowait time, or an explicit production-gate failure value."""
+    if platform.system() != "Linux":
+        return None, "unavailable"
+    try:
+        fields = Path("/proc/stat").read_text(encoding="utf-8").splitlines()[0].split()
+        ticks = int(fields[5])
+        return ticks / os.sysconf("SC_CLK_TCK"), "available"
+    except (IndexError, OSError, ValueError):
+        return None, "unavailable"
+
+
+def _telemetry_metrics() -> dict[str, Any]:
+    rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    rss_bytes = rss if platform.system() == "Darwin" else rss * 1024
+    iowait_seconds, iowait_status = _iowait_seconds()
+    return {
+        "process_rss_bytes": rss_bytes,
+        "disk_free_bytes": shutil.disk_usage(".").free,
+        "iowait_seconds": iowait_seconds,
+        "iowait_status": iowait_status,
+    }
+
+
+def _ack_path_for(telemetry_path: Path) -> Path:
+    return telemetry_path.with_suffix(f"{telemetry_path.suffix}.ack.jsonl")
+
+
+def _append_durable_telemetry(path: Path, payload: Mapping[str, Any]) -> dict[str, Any]:
+    """Persist a subchunk record then a separately fsynced acknowledgement.
+
+    The acknowledgement is written only after the telemetry record's successful
+    ``write -> flush -> os.fsync`` sequence.  If either fsync fails, no caller
+    receives a checkpoint-eligible acknowledgement.
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
-    encoded = json.dumps(payload, sort_keys=True) + "\n"
-    with path.open("a", encoding="utf-8") as handle:
-        handle.write(encoded)
-        handle.flush()
-        os.fsync(handle.fileno())
+    record = dict(payload)
+    if not record.get("run_id") or not record.get("record_id"):
+        raise ValueError("durable telemetry requires non-empty run_id and record_id")
+    canonical = json.dumps(record, sort_keys=True, separators=(",", ":"))
+    record["record_sha256"] = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+    encoded = json.dumps(record, sort_keys=True) + "\n"
+    try:
+        with path.open("a", encoding="utf-8") as handle:
+            handle.write(encoded)
+            handle.flush()
+            os.fsync(handle.fileno())
+    except OSError as exc:
+        raise _TelemetryDurabilityError(f"telemetry fsync failed for {path.resolve()}: {exc}") from exc
+
+    ack_path = _ack_path_for(path)
+    acknowledgement = {
+        "acknowledgement_path": str(ack_path.resolve()),
+        "acknowledged_at": datetime.now(timezone.utc).isoformat(),
+        "fsync_success": True,
+        "record_id": record["record_id"],
+        "record_sha256": record["record_sha256"],
+        "run_id": record["run_id"],
+        "telemetry_path": str(path.resolve()),
+    }
+    ack_encoded = json.dumps(acknowledgement, sort_keys=True) + "\n"
+    existing_acknowledgements = ack_path.read_text(encoding="utf-8") if ack_path.exists() else ""
+    pending_ack_path = ack_path.with_suffix(f"{ack_path.suffix}.{record['record_id']}.pending")
+    try:
+        with pending_ack_path.open("w", encoding="utf-8") as handle:
+            handle.write(existing_acknowledgements + ack_encoded)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(pending_ack_path, ack_path)
+    except OSError as exc:
+        # A pending file never becomes the visible acknowledgement until its
+        # fsync succeeds, so an fsync error cannot expose success evidence.
+        pending_ack_path.unlink(missing_ok=True)
+        raise _TelemetryDurabilityError(f"telemetry acknowledgement fsync failed for {ack_path.resolve()}: {exc}") from exc
+    return acknowledgement
 
 
-def _sync_relation_pass(*, kg_root: str | Path, window: RelationWindow, write: bool, resume_chunk: int, max_chunks: int | None, batch_size: int, verify_selected_live: bool, telemetry_path: Path | None, _token: object | None = None) -> LiveEdgeSyncSummary:
+def _sync_relation_pass(*, kg_root: str | Path, window: RelationWindow, write: bool, resume_chunk: int, max_chunks: int | None, batch_size: int, verify_selected_live: bool, telemetry_path: Path | None, run_id: str, sync_pass_index: int = 0, _token: object | None = None) -> LiveEdgeSyncSummary:
     if resume_chunk < 0:
         raise ValueError("resume_chunk must be >= 0")
     if write and (not verify_selected_live or not _has_active_writer_capability(_token)):
@@ -364,6 +457,7 @@ def _sync_relation_pass(*, kg_root: str | Path, window: RelationWindow, write: b
     KGEdge, KGEdgeEvidence = _registry_models()
     durable_edge, durable_evidence = window.edge_offset, window.evidence_offset
     processed = 0
+    started_at = time.monotonic()
     for index, pair in enumerate(zip_longest(edge_iter, evidence_iter, fillvalue=None)):
         if index < resume_chunk:
             for item in pair:
@@ -393,14 +487,47 @@ def _sync_relation_pass(*, kg_root: str | Path, window: RelationWindow, write: b
             summary.status_detail = str(exc)
             summary.source_live_mismatch_count = None if not isinstance(exc, _VerificationError) else 1
             return summary
-        # Advance a cursor only for rows selected from that side.
-        if not edge_frame.empty:
-            durable_edge = edge_absolute + len(edge_frame)
-        if not evidence_frame.empty:
-            durable_evidence = evidence_absolute + len(evidence_frame)
-        chunk = LiveEdgeSyncChunk(relation=window.relation, chunk_index=index, edge_offset=edge_absolute, edge_limit=len(edge_frame), evidence_offset=evidence_absolute, evidence_limit=len(evidence_frame), edge_rows_available=edge_total, edge_rows_selected=len(edge_frame), evidence_rows_available=evidence_total, evidence_rows_selected=len(evidence_frame), edge_upserts=edge_upserts, evidence_upserts=evidence_upserts, durable_edge_current_offset=durable_edge, durable_evidence_current_offset=durable_evidence, status="selected-live-verified")
+        next_durable_edge = edge_absolute + len(edge_frame) if not edge_frame.empty else durable_edge
+        next_durable_evidence = evidence_absolute + len(evidence_frame) if not evidence_frame.empty else durable_evidence
+        elapsed_seconds = time.monotonic() - started_at
+        chunk = LiveEdgeSyncChunk(
+            run_id=run_id,
+            record_id=f"{run_id}:{window.relation}:pass-{sync_pass_index}:{index}:{edge_absolute}:{evidence_absolute}",
+            relation=window.relation,
+            source_edge_offset=window.edge_offset,
+            source_edge_limit=window.edge_limit,
+            source_evidence_offset=window.evidence_offset,
+            source_evidence_limit=window.evidence_limit,
+            sync_pass_index=sync_pass_index,
+            chunk_index=index,
+            edge_offset=edge_absolute,
+            edge_limit=len(edge_frame),
+            evidence_offset=evidence_absolute,
+            evidence_limit=len(evidence_frame),
+            edge_rows_available=edge_total,
+            edge_rows_selected=len(edge_frame),
+            evidence_rows_available=evidence_total,
+            evidence_rows_selected=len(evidence_frame),
+            edge_upserts=edge_upserts,
+            evidence_upserts=evidence_upserts,
+            durable_edge_current_offset=next_durable_edge,
+            durable_evidence_current_offset=next_durable_evidence,
+            last_progress_at=datetime.now(timezone.utc).isoformat(),
+            elapsed_seconds=elapsed_seconds,
+            edge_rows_per_second=len(edge_frame) / elapsed_seconds if elapsed_seconds else None,
+            evidence_rows_per_second=len(evidence_frame) / elapsed_seconds if elapsed_seconds else None,
+            **_telemetry_metrics(),
+            status="selected-live-verified",
+        )
         if telemetry_path is not None:
-            _append_telemetry(telemetry_path, asdict(chunk))
+            try:
+                _append_durable_telemetry(telemetry_path, asdict(chunk))
+            except (_TelemetryDurabilityError, OSError, ValueError) as exc:
+                summary.status = "telemetry_failed"
+                summary.status_detail = str(exc)
+                return summary
+        # Advance cursors only after selected-live verification and telemetry acknowledgement.
+        durable_edge, durable_evidence = next_durable_edge, next_durable_evidence
         summary.chunks.append(chunk)
         summary.edge_upserts += edge_upserts
         summary.evidence_upserts += evidence_upserts
@@ -418,22 +545,27 @@ def _sync_relation_with_token(*, lamin_instance: str, token: object, **kwargs: A
     return _sync_relation_pass(_token=token, **kwargs)
 
 
-def sync_relation_to_lamindb(*, kg_root: str | Path, relation: str, edge_limit: int = DEFAULT_EDGE_LIMIT, evidence_limit: int = DEFAULT_EVIDENCE_LIMIT, edge_offset: int = 0, evidence_offset: int = 0, chunk_size: int = DEFAULT_CHUNK_SIZE, resume_chunk: int = 0, max_chunks: int | None = None, batch_size: int = DEFAULT_BATCH_SIZE, lamin_instance: str = _EXPECTED_INSTANCE, write: bool = False, idempotence_passes: int = 1, verify_selected_live: bool = False, telemetry_path: str | Path | None = None) -> LiveEdgeSyncSummary:
+def sync_relation_to_lamindb(*, kg_root: str | Path, relation: str, edge_limit: int = DEFAULT_EDGE_LIMIT, evidence_limit: int = DEFAULT_EVIDENCE_LIMIT, edge_offset: int = 0, evidence_offset: int = 0, chunk_size: int = DEFAULT_CHUNK_SIZE, resume_chunk: int = 0, max_chunks: int | None = None, batch_size: int = DEFAULT_BATCH_SIZE, lamin_instance: str = _EXPECTED_INSTANCE, write: bool = False, idempotence_passes: int = 1, verify_selected_live: bool = False, telemetry_path: str | Path | None = None, run_id: str | None = None) -> LiveEdgeSyncSummary:
     if idempotence_passes < 1:
         raise ValueError("idempotence_passes must be >= 1")
     window = RelationWindow(relation, edge_offset, edge_limit, evidence_offset, evidence_limit, chunk_size)
-    common = dict(kg_root=kg_root, window=window, write=write, resume_chunk=resume_chunk, max_chunks=max_chunks, batch_size=batch_size, verify_selected_live=verify_selected_live, telemetry_path=Path(telemetry_path) if telemetry_path else None)
+    effective_run_id = run_id or uuid.uuid4().hex
+    if not effective_run_id.strip():
+        raise ValueError("run_id must be non-empty")
+    common: dict[str, Any] = dict(kg_root=kg_root, window=window, write=write, resume_chunk=resume_chunk, max_chunks=max_chunks, batch_size=batch_size, verify_selected_live=verify_selected_live, telemetry_path=Path(telemetry_path) if telemetry_path else None, run_id=effective_run_id, sync_pass_index=0)
     if not write:
         return _sync_relation_pass(**common)
     if not verify_selected_live:
         raise RuntimeError("fail closed: write requires verify_selected_live=True")
+    if telemetry_path is None:
+        raise RuntimeError("fail closed: write requires a durable telemetry_path")
     _connect_lamin(lamin_instance)
     _configure_sqlite_timeout()
     with _single_writer_guard(lamin_instance) as token:
         summary = _sync_relation_with_token(lamin_instance=lamin_instance, token=token, **common)
         summary.idempotence_passes = idempotence_passes
-        for _ in range(1, idempotence_passes):
-            summary = _sync_relation_with_token(lamin_instance=lamin_instance, token=token, **common)
+        for sync_pass_index in range(1, idempotence_passes):
+            summary = _sync_relation_with_token(lamin_instance=lamin_instance, token=token, **{**common, "sync_pass_index": sync_pass_index})
             summary.idempotence_passes = idempotence_passes
         return summary
 
@@ -462,6 +594,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--batch-size", type=int, default=DEFAULT_BATCH_SIZE)
     parser.add_argument("--verify-selected-live", action="store_true")
     parser.add_argument("--progress-jsonl")
+    parser.add_argument("--run-id", help="stable operator-supplied identity persisted on every telemetry record")
     parser.add_argument("--lamin-instance", default=_EXPECTED_INSTANCE)
     parser.add_argument("--write", action="store_true")
     parser.add_argument("--json", action="store_true")
@@ -470,7 +603,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    summaries = sync_parquet_edges_to_lamindb(args.kg_root, relations=args.relations or list(DEFAULT_RELATIONS), edge_offset=args.edge_offset, edge_limit=args.edge_limit, evidence_offset=args.evidence_offset, evidence_limit=args.evidence_limit, chunk_size=args.chunk_size, resume_chunk=args.resume_chunk, max_chunks=args.max_chunks, batch_size=args.batch_size, verify_selected_live=args.verify_selected_live, telemetry_path=args.progress_jsonl, lamin_instance=args.lamin_instance, write=args.write)
+    summaries = sync_parquet_edges_to_lamindb(args.kg_root, relations=args.relations or list(DEFAULT_RELATIONS), edge_offset=args.edge_offset, edge_limit=args.edge_limit, evidence_offset=args.evidence_offset, evidence_limit=args.evidence_limit, chunk_size=args.chunk_size, resume_chunk=args.resume_chunk, max_chunks=args.max_chunks, batch_size=args.batch_size, verify_selected_live=args.verify_selected_live, telemetry_path=args.progress_jsonl, run_id=args.run_id, lamin_instance=args.lamin_instance, write=args.write)
     print(summaries_to_json(summaries) if args.json else pd.DataFrame([asdict(item) for item in summaries]).to_string(index=False))
     return 0
 

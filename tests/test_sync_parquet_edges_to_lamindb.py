@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import contextlib
+import json
+import os
 import threading
 from pathlib import Path
 from typing import Any
@@ -81,7 +83,7 @@ def test_limit_zero_means_all_remaining_in_dry_run(tmp_path: Path) -> None:
 def test_finite_limit_exhausted_by_resume_is_not_unbounded(tmp_path: Path, monkeypatch) -> None:
     _fixture(tmp_path)
     _fake_lamin(monkeypatch)
-    result = sync.sync_relation_to_lamindb(kg_root=tmp_path, relation=REL, edge_limit=1, evidence_limit=1, chunk_size=1, resume_chunk=1, write=True, verify_selected_live=True)
+    result = sync.sync_relation_to_lamindb(kg_root=tmp_path, relation=REL, edge_limit=1, evidence_limit=1, chunk_size=1, resume_chunk=1, write=True, verify_selected_live=True, telemetry_path=tmp_path / "progress.jsonl")
     assert result.status == "no_verified_subchunks"
     assert result.chunks == []
     assert Edge.objects.records == Evidence.objects.records == {}
@@ -91,7 +93,7 @@ def test_finite_limit_exhausted_by_resume_is_not_unbounded(tmp_path: Path, monke
 def test_asymmetric_streams_advance_only_nonempty_cursor(tmp_path: Path, monkeypatch, edges: int, evidence: int, expected: tuple[int, int]) -> None:
     _fixture(tmp_path, edges=edges, evidence=evidence)
     _fake_lamin(monkeypatch)
-    result = sync.sync_relation_to_lamindb(kg_root=tmp_path, relation=REL, edge_limit=0, evidence_limit=0, chunk_size=1, write=True, verify_selected_live=True)
+    result = sync.sync_relation_to_lamindb(kg_root=tmp_path, relation=REL, edge_limit=0, evidence_limit=0, chunk_size=1, write=True, verify_selected_live=True, telemetry_path=tmp_path / "progress.jsonl")
     assert (result.durable_edge_current_offset, result.durable_evidence_current_offset) == expected
     assert [(c.edge_rows_selected, c.evidence_rows_selected) for c in result.chunks][-1] in {(1, 0), (0, 1)}
 
@@ -107,12 +109,128 @@ def test_mismatch_emits_no_telemetry_or_durable_offset(tmp_path: Path, monkeypat
     assert not telemetry.exists()
 
 
+def test_durable_telemetry_ack_follows_fsync_and_binds_record_identity(tmp_path: Path, monkeypatch) -> None:
+    telemetry = tmp_path / "progress.jsonl"
+    events: list[str] = []
+    original_fsync = os.fsync
+
+    class RecordingHandle:
+        def __init__(self, handle): self.handle = handle
+        def write(self, value):
+            events.append("write")
+            return self.handle.write(value)
+        def flush(self):
+            events.append("flush")
+            return self.handle.flush()
+        def fileno(self): return self.handle.fileno()
+        def __enter__(self): return self
+        def __exit__(self, *args): return self.handle.close()
+        def __getattr__(self, name): return getattr(self.handle, name)
+
+    original_open = Path.open
+    def recording_open(self, *args, **kwargs): return RecordingHandle(original_open(self, *args, **kwargs))
+    def recording_fsync(fd: int) -> None:
+        events.append("fsync")
+        original_fsync(fd)
+
+    monkeypatch.setattr(Path, "open", recording_open)
+    monkeypatch.setattr(sync.os, "fsync", recording_fsync)
+    ack = sync._append_durable_telemetry(telemetry, {"run_id": "run-1", "record_id": "record-1", "relation": REL})
+
+    assert events == ["write", "flush", "fsync", "write", "flush", "fsync"]
+    assert ack["fsync_success"] is True
+    assert ack["record_id"] == "record-1"
+    assert ack["telemetry_path"] == str(telemetry.resolve())
+    assert ack["acknowledgement_path"] == str(telemetry.with_suffix(".jsonl.ack.jsonl").resolve())
+    payload = json.loads(telemetry.read_text().strip())
+    assert ack["record_sha256"] == payload["record_sha256"]
+    ack_path = telemetry.with_suffix(".jsonl.ack.jsonl")
+    assert json.loads(ack_path.read_text().strip()) == ack
+
+
+def test_fsync_failure_emits_no_success_ack_and_does_not_advance_checkpoint(tmp_path: Path, monkeypatch) -> None:
+    _fixture(tmp_path)
+    _fake_lamin(monkeypatch)
+    telemetry = tmp_path / "progress.jsonl"
+    monkeypatch.setattr(sync.os, "fsync", lambda _: (_ for _ in ()).throw(OSError("disk failure")))
+
+    result = sync.sync_relation_to_lamindb(kg_root=tmp_path, relation=REL, edge_limit=1, evidence_limit=1, chunk_size=1, write=True, verify_selected_live=True, telemetry_path=telemetry, run_id="run-fsync-failure")
+
+    assert result.status == "telemetry_failed"
+    assert result.chunks == []
+    assert result.durable_edge_current_offset is None
+    assert result.durable_evidence_current_offset is None
+    assert not telemetry.with_suffix(".jsonl.ack.jsonl").exists()
+
+
+def test_ack_fsync_failure_leaves_no_success_ack_or_checkpoint(tmp_path: Path, monkeypatch) -> None:
+    _fixture(tmp_path)
+    _fake_lamin(monkeypatch)
+    telemetry = tmp_path / "progress.jsonl"
+    original_fsync = os.fsync
+    calls = 0
+    def fail_ack_fsync(fd: int) -> None:
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise OSError("ack disk failure")
+        original_fsync(fd)
+    monkeypatch.setattr(sync.os, "fsync", fail_ack_fsync)
+
+    result = sync.sync_relation_to_lamindb(kg_root=tmp_path, relation=REL, edge_limit=1, evidence_limit=1, chunk_size=1, write=True, verify_selected_live=True, telemetry_path=telemetry, run_id="run-ack-failure")
+
+    assert result.status == "telemetry_failed"
+    assert result.durable_edge_current_offset is None
+    assert result.durable_evidence_current_offset is None
+    ack_path = telemetry.with_suffix(".jsonl.ack.jsonl")
+    assert not ack_path.exists() or not ack_path.read_text()
+
+
+def test_committed_telemetry_contains_independent_progress_contract(tmp_path: Path, monkeypatch) -> None:
+    _fixture(tmp_path)
+    _fake_lamin(monkeypatch)
+    telemetry = tmp_path / "progress.jsonl"
+
+    result = sync.sync_relation_to_lamindb(kg_root=tmp_path, relation=REL, edge_offset=0, edge_limit=1, evidence_offset=0, evidence_limit=1, chunk_size=1, write=True, verify_selected_live=True, telemetry_path=telemetry, run_id="stable-run")
+
+    assert result.status == "bounded live sync verified"
+    payload = json.loads(telemetry.read_text().strip())
+    assert payload["run_id"] == "stable-run"
+    assert payload["relation"] == REL
+    assert payload["edge_offset"] == payload["evidence_offset"] == 0
+    assert payload["edge_rows_selected"] == payload["evidence_rows_selected"] == 1
+    assert payload["durable_edge_current_offset"] == payload["durable_evidence_current_offset"] == 1
+    for field in ("record_id", "record_sha256", "source_edge_offset", "source_edge_limit", "source_evidence_offset", "source_evidence_limit", "last_progress_at", "elapsed_seconds", "edge_rows_per_second", "evidence_rows_per_second", "process_rss_bytes", "disk_free_bytes", "iowait_seconds", "iowait_status"):
+        assert field in payload
+
+
+def test_idempotence_passes_preserve_run_identity_with_distinct_record_ids(tmp_path: Path, monkeypatch) -> None:
+    _fixture(tmp_path)
+    _fake_lamin(monkeypatch)
+    telemetry = tmp_path / "progress.jsonl"
+
+    sync.sync_relation_to_lamindb(kg_root=tmp_path, relation=REL, edge_limit=1, evidence_limit=1, chunk_size=1, write=True, verify_selected_live=True, telemetry_path=telemetry, run_id="stable-run", idempotence_passes=2)
+
+    records = [json.loads(line) for line in telemetry.read_text().splitlines()]
+    assert [record["run_id"] for record in records] == ["stable-run", "stable-run"]
+    assert [record["sync_pass_index"] for record in records] == [0, 1]
+    assert len({record["record_id"] for record in records}) == 2
+
+
 def test_unverified_write_is_rejected_before_upsert(tmp_path: Path, monkeypatch) -> None:
     _fixture(tmp_path)
     _fake_lamin(monkeypatch)
     with pytest.raises(RuntimeError, match="verify_selected_live"):
         sync.sync_relation_to_lamindb(kg_root=tmp_path, relation=REL, write=True)
     assert Edge.objects.records == {}
+
+
+def test_verified_write_requires_durable_telemetry_before_upsert(tmp_path: Path, monkeypatch) -> None:
+    _fixture(tmp_path)
+    _fake_lamin(monkeypatch)
+    with pytest.raises(RuntimeError, match="durable telemetry_path"):
+        sync.sync_relation_to_lamindb(kg_root=tmp_path, relation=REL, write=True, verify_selected_live=True)
+    assert Edge.objects.records == Evidence.objects.records == {}
 
 
 def test_direct_api_cannot_bypass_global_lock_with_other_telemetry_path(tmp_path: Path, monkeypatch) -> None:
@@ -141,6 +259,7 @@ def _direct_write_kwargs(tmp_path: Path) -> dict[str, Any]:
         "batch_size": 1,
         "verify_selected_live": True,
         "telemetry_path": None,
+        "run_id": "direct-test-run",
     }
 
 
