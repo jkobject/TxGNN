@@ -432,6 +432,82 @@ def test_resume_seeks_directly_to_unacknowledged_chunk_without_transforming_pref
     assert {record["evidence_offset"] for record in stage_payload["records"]} == {4}
 
 
+@pytest.mark.parametrize(
+    "failed_stage",
+    [
+        "edge_upsert_start",
+        "evidence_upsert_start",
+        "selected_live_verification_start",
+        "transaction_commit_start",
+        "progress_flush_fsync_start",
+        "ack_flush_fsync_start",
+    ],
+)
+def test_resumed_pre_ack_failure_reports_existing_durable_baseline(
+    failed_stage: str, tmp_path: Path, monkeypatch
+) -> None:
+    _fixture(tmp_path, edges=2, evidence=2, row_group_size=2)
+    _fake_lamin(monkeypatch)
+    edge_item = next(
+        sync._iter_selected_batches(
+            tmp_path,
+            "edges",
+            REL,
+            offset=0,
+            limit=2,
+            chunk_size=2,
+            transform=lambda batch, _: sync._transform_edge(batch),
+        )
+    )
+    evidence_item = next(
+        sync._iter_selected_batches(
+            tmp_path,
+            "evidence",
+            REL,
+            offset=0,
+            limit=2,
+            chunk_size=2,
+            transform=sync._transform_evidence,
+        )
+    )
+    frames = {"edges": edge_item[1], "evidence": evidence_item[1]}
+    monkeypatch.setattr(sync, "_parquet_metadata", lambda *_: (None, 13_885_000))
+    monkeypatch.setattr(
+        sync,
+        "_iter_selected_batches",
+        lambda _root, kind, _relation, *, offset, **_kwargs: iter([(offset, frames[kind])]),
+    )
+    original_emit = sync._ChunkStageTelemetry.emit
+
+    def fail_after_durable_stage(self, stage, **kwargs):
+        original_emit(self, stage, **kwargs)
+        if kwargs["chunk_index"] == 1 and stage == failed_stage:
+            raise sync._TelemetryDurabilityError(f"injected failure at {stage}")
+
+    monkeypatch.setattr(sync._ChunkStageTelemetry, "emit", fail_after_durable_stage)
+    telemetry = tmp_path / "resumed.progress.jsonl"
+    result = sync.sync_relation_to_lamindb(
+        kg_root=tmp_path,
+        relation=REL,
+        edge_offset=13_870_000,
+        edge_limit=15_000,
+        evidence_offset=13_870_000,
+        evidence_limit=15_000,
+        chunk_size=5_000,
+        resume_chunk=1,
+        write=True,
+        verify_selected_live=True,
+        telemetry_path=telemetry,
+        run_id=f"t_fixture-resumed-{failed_stage}",
+    )
+
+    assert result.status in {"verification_failed", "telemetry_failed"}
+    assert result.chunks == []
+    assert result.durable_edge_current_offset == 13_875_000
+    assert result.durable_evidence_current_offset == 13_875_000
+    assert not sync._ack_path_for(telemetry).exists()
+
+
 def test_max_chunks_does_not_prefetch_or_transform_the_next_chunk(tmp_path: Path, monkeypatch) -> None:
     _fixture(tmp_path, edges=6, evidence=6, row_group_size=2)
     _fake_lamin(monkeypatch)

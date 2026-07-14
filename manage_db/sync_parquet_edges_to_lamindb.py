@@ -692,6 +692,12 @@ def _sync_relation_pass(*, kg_root: str | Path, window: RelationWindow, write: b
     evidence_start = window.evidence_offset + evidence_resume_rows
     edge_remaining_limit = 0 if window.edge_limit == 0 else max(0, window.edge_limit - edge_resume_rows)
     evidence_remaining_limit = 0 if window.evidence_limit == 0 else max(0, window.evidence_limit - evidence_resume_rows)
+    # A resumed pass starts from an already acknowledged durable boundary.  Set
+    # it on the summary before any source, write, verification, or telemetry
+    # operation can fail so failure reports never erase the no-replay baseline.
+    if resume_chunk:
+        summary.durable_edge_current_offset = edge_start
+        summary.durable_evidence_current_offset = evidence_start
     active_chunk_index = resume_chunk
     if stage_telemetry is not None:
         stage_telemetry.emit(
