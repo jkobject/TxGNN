@@ -20,7 +20,6 @@ import threading
 import time
 import uuid
 from dataclasses import asdict, dataclass, field
-from itertools import islice, zip_longest
 from pathlib import Path
 from typing import Any, Callable, Iterable, Iterator, Mapping, Sequence
 
@@ -457,8 +456,8 @@ def _fsync_stage_directory(path: Path) -> None:
         os.close(directory_fd)
 
 
-class _FirstChunkStageTelemetry:
-    """Atomically persist the active stage until the first chunk is acknowledged."""
+class _ChunkStageTelemetry:
+    """Atomically persist the active stage for the currently executing chunk."""
 
     def __init__(
         self,
@@ -482,20 +481,29 @@ class _FirstChunkStageTelemetry:
         self.task_id = task_id
         self.run_id = run_id
         self.records: list[dict[str, Any]] = []
+        self.active_chunk_index: int | None = None
+        self.stage_sequence = 0
 
     def emit(
         self,
         stage: str,
         *,
+        chunk_index: int,
         edge_offset: int,
         evidence_offset: int,
         edge_rows: int = 0,
         evidence_rows: int = 0,
         details: Mapping[str, Any] | None = None,
     ) -> None:
+        if self.active_chunk_index != chunk_index:
+            self.active_chunk_index = chunk_index
+            self.records = []
+        self.stage_sequence += 1
         record = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "stage": stage,
+            "stage_sequence": self.stage_sequence,
+            "chunk_index": chunk_index,
             "edge_offset": edge_offset,
             "evidence_offset": evidence_offset,
             "edge_rows": edge_rows,
@@ -510,7 +518,8 @@ class _FirstChunkStageTelemetry:
             record["details"] = dict(details)
         self.records.append(record)
         payload = {
-            "schema_version": 1,
+            "schema_version": 2,
+            "active_chunk_index": chunk_index,
             "active_stage": stage,
             "records": self.records,
         }
@@ -527,7 +536,7 @@ class _FirstChunkStageTelemetry:
         except OSError as exc:
             pending.unlink(missing_ok=True)
             raise _TelemetryDurabilityError(
-                f"first-chunk stage telemetry failed for {self.path.resolve()}: {exc}"
+                f"chunk stage telemetry failed for {self.path.resolve()}: {exc}"
             ) from exc
 
 
@@ -549,7 +558,7 @@ def _append_durable_telemetry(
     path: Path,
     payload: Mapping[str, Any],
     *,
-    on_stage: Callable[[str], None] | None = None,
+    on_stage: Callable[[str, Mapping[str, Any] | None], None] | None = None,
 ) -> dict[str, Any]:
     """Persist a subchunk record then a separately fsynced acknowledgement.
 
@@ -566,13 +575,17 @@ def _append_durable_telemetry(
     encoded = json.dumps(record, sort_keys=True) + "\n"
     try:
         if on_stage is not None:
-            on_stage("progress_flush_fsync_start")
+            on_stage("progress_flush_fsync_start", None)
+        progress_started = time.monotonic()
         with path.open("a", encoding="utf-8") as handle:
             handle.write(encoded)
             handle.flush()
             os.fsync(handle.fileno())
         if on_stage is not None:
-            on_stage("progress_flush_fsync_complete")
+            on_stage(
+                "progress_flush_fsync_complete",
+                {"duration_seconds": time.monotonic() - progress_started},
+            )
     except OSError as exc:
         raise _TelemetryDurabilityError(f"telemetry fsync failed for {path.resolve()}: {exc}") from exc
 
@@ -591,7 +604,8 @@ def _append_durable_telemetry(
     pending_ack_path = ack_path.with_suffix(f"{ack_path.suffix}.{record['record_id']}.pending")
     try:
         if on_stage is not None:
-            on_stage("ack_flush_fsync_start")
+            on_stage("ack_flush_fsync_start", None)
+        ack_started = time.monotonic()
         with pending_ack_path.open("w", encoding="utf-8") as handle:
             handle.write(existing_acknowledgements + ack_encoded)
             handle.flush()
@@ -599,7 +613,10 @@ def _append_durable_telemetry(
         os.replace(pending_ack_path, ack_path)
         _fsync_directory(ack_path.parent)
         if on_stage is not None:
-            on_stage("ack_flush_fsync_complete")
+            on_stage(
+                "ack_flush_fsync_complete",
+                {"duration_seconds": time.monotonic() - ack_started},
+            )
     except OSError as exc:
         # Before replace, a pending file is cleaned up.  After replace, an ack
         # can be visible but is intentionally unaccepted if the directory fsync
@@ -615,10 +632,11 @@ def _sync_relation_pass(*, kg_root: str | Path, window: RelationWindow, write: b
         raise ValueError("resume_chunk must be >= 0")
     if write and (not verify_selected_live or not _has_active_writer_capability(_token)):
         raise RuntimeError("fail closed: writes require selected-live verification and an active writer capability")
+
     effective_task_id = task_id or run_id.split("-", 1)[0]
     stage_telemetry = None
     if write and telemetry_path is not None:
-        stage_telemetry = _FirstChunkStageTelemetry(
+        stage_telemetry = _ChunkStageTelemetry(
             telemetry_path=telemetry_path,
             kg_root=kg_root,
             window=window,
@@ -626,34 +644,39 @@ def _sync_relation_pass(*, kg_root: str | Path, window: RelationWindow, write: b
             task_id=effective_task_id,
             run_id=run_id,
         )
-        stage_telemetry.emit(
-            "iterator_window_initialization",
-            edge_offset=window.edge_offset,
-            evidence_offset=window.evidence_offset,
-            details={
-                "edge_limit": window.edge_limit,
-                "evidence_limit": window.evidence_limit,
-                "chunk_size": window.chunk_size,
-                "resume_chunk": resume_chunk,
-            },
-        )
     _, edge_total = _parquet_metadata(kg_root, "edges", window.relation)
     _, evidence_total = _parquet_metadata(kg_root, "evidence", window.relation)
     summary = LiveEdgeSyncSummary(relation=window.relation, edge_offset=window.edge_offset, edge_limit=window.edge_limit, evidence_offset=window.evidence_offset, evidence_limit=window.evidence_limit, chunk_size=window.chunk_size, resume_chunk=resume_chunk, max_chunks=max_chunks, edge_rows_available=edge_total, evidence_rows_available=evidence_total, edge_rows_selected=_selected_count(edge_total, window.edge_offset, window.edge_limit), evidence_rows_selected=_selected_count(evidence_total, window.evidence_offset, window.evidence_limit))
     if not write:
         return summary
+
     edge_resume_rows = min(resume_chunk * window.chunk_size, summary.edge_rows_selected)
     evidence_resume_rows = min(resume_chunk * window.chunk_size, summary.evidence_rows_selected)
     edge_start = window.edge_offset + edge_resume_rows
     evidence_start = window.evidence_offset + evidence_resume_rows
     edge_remaining_limit = 0 if window.edge_limit == 0 else max(0, window.edge_limit - edge_resume_rows)
     evidence_remaining_limit = 0 if window.evidence_limit == 0 else max(0, window.evidence_limit - evidence_resume_rows)
+    active_chunk_index = resume_chunk
+    if stage_telemetry is not None:
+        stage_telemetry.emit(
+            "iterator_window_initialization",
+            chunk_index=resume_chunk,
+            edge_offset=edge_start,
+            evidence_offset=evidence_start,
+            details={
+                "edge_limit": edge_remaining_limit,
+                "evidence_limit": evidence_remaining_limit,
+                "chunk_size": window.chunk_size,
+                "resume_chunk": resume_chunk,
+            },
+        )
 
     def source_stage(stage: str, details: Mapping[str, Any]) -> None:
         if stage_telemetry is not None:
             rows = int(details.get("rows", 0))
             stage_telemetry.emit(
                 stage,
+                chunk_index=active_chunk_index,
                 edge_offset=edge_start,
                 evidence_offset=evidence_start,
                 edge_rows=rows if stage.startswith("edge_") else 0,
@@ -661,142 +684,85 @@ def _sync_relation_pass(*, kg_root: str | Path, window: RelationWindow, write: b
                 details=details,
             )
 
-    edge_iter = iter(()) if window.edge_limit > 0 and edge_remaining_limit == 0 else _iter_selected_batches(
-        kg_root,
-        "edges",
-        window.relation,
-        offset=edge_start,
-        limit=edge_remaining_limit,
-        chunk_size=window.chunk_size,
-        transform=lambda b, _: _transform_edge(b),
-        on_first_source_stage=source_stage,
-    )
-    evidence_iter = iter(()) if window.evidence_limit > 0 and evidence_remaining_limit == 0 else _iter_selected_batches(
-        kg_root,
-        "evidence",
-        window.relation,
-        offset=evidence_start,
-        limit=evidence_remaining_limit,
-        chunk_size=window.chunk_size,
-        transform=_transform_evidence,
-        on_first_source_stage=source_stage,
-    )
+    edge_iter = iter(()) if window.edge_limit > 0 and edge_remaining_limit == 0 else _iter_selected_batches(kg_root, "edges", window.relation, offset=edge_start, limit=edge_remaining_limit, chunk_size=window.chunk_size, transform=lambda b, _: _transform_edge(b), on_first_source_stage=source_stage)
+    evidence_iter = iter(()) if window.evidence_limit > 0 and evidence_remaining_limit == 0 else _iter_selected_batches(kg_root, "evidence", window.relation, offset=evidence_start, limit=evidence_remaining_limit, chunk_size=window.chunk_size, transform=_transform_evidence, on_first_source_stage=source_stage)
     KGEdge, KGEdgeEvidence = _registry_models()
     durable_edge, durable_evidence = edge_start, evidence_start
+    edge_target = window.edge_offset + summary.edge_rows_selected
+    evidence_target = window.evidence_offset + summary.evidence_rows_selected
     processed = 0
     started_at = time.monotonic()
-    pairs: Iterable[tuple[tuple[int, pd.DataFrame] | None, tuple[int, pd.DataFrame] | None]] = zip_longest(edge_iter, evidence_iter, fillvalue=None)
-    if max_chunks is not None:
-        pairs = islice(pairs, max_chunks)
-    for index, pair in enumerate(pairs, start=resume_chunk):
-        edge_item, evidence_item = pair
+
+    def emit(stage: str, *, index: int, edge_offset: int, evidence_offset: int, edge_rows: int = 0, evidence_rows: int = 0, details: Mapping[str, Any] | None = None) -> None:
+        if stage_telemetry is not None:
+            stage_telemetry.emit(stage, chunk_index=index, edge_offset=edge_offset, evidence_offset=evidence_offset, edge_rows=edge_rows, evidence_rows=evidence_rows, details=details)
+
+    while max_chunks is None or processed < max_chunks:
+        if durable_edge >= edge_target and durable_evidence >= evidence_target:
+            break
+        index = resume_chunk + processed
+        active_chunk_index = index
+
+        emit("edge_iterator_next_start", index=index, edge_offset=durable_edge, evidence_offset=durable_evidence)
+        operation_started = time.monotonic()
+        edge_item = next(edge_iter, None)
         edge_absolute, edge_frame = edge_item if edge_item is not None else (durable_edge, _empty_edge_frame())
+        emit("edge_iterator_next_complete", index=index, edge_offset=edge_absolute, evidence_offset=durable_evidence, edge_rows=len(edge_frame), details={"duration_seconds": time.monotonic() - operation_started})
+
+        emit("evidence_iterator_next_start", index=index, edge_offset=edge_absolute, evidence_offset=durable_evidence, edge_rows=len(edge_frame))
+        operation_started = time.monotonic()
+        evidence_item = next(evidence_iter, None)
         evidence_absolute, evidence_frame = evidence_item if evidence_item is not None else (durable_evidence, _empty_evidence_frame())
+        emit("evidence_iterator_next_complete", index=index, edge_offset=edge_absolute, evidence_offset=evidence_absolute, edge_rows=len(edge_frame), evidence_rows=len(evidence_frame), details={"duration_seconds": time.monotonic() - operation_started})
         if edge_frame.empty and evidence_frame.empty:
-            continue
-        first_processed_chunk = processed == 0
-        if first_processed_chunk and stage_telemetry is not None:
-            stage_telemetry.emit(
-                "first_chunk_materialized",
-                edge_offset=edge_absolute,
-                evidence_offset=evidence_absolute,
-                edge_rows=len(edge_frame),
-                evidence_rows=len(evidence_frame),
-            )
+            break
+        emit("chunk_materialized", index=index, edge_offset=edge_absolute, evidence_offset=evidence_absolute, edge_rows=len(edge_frame), evidence_rows=len(evidence_frame))
+
         try:
-            if first_processed_chunk and stage_telemetry is not None:
-                stage_telemetry.emit(
-                    "transaction_upsert_start",
-                    edge_offset=edge_absolute,
-                    evidence_offset=evidence_absolute,
-                    edge_rows=len(edge_frame),
-                    evidence_rows=len(evidence_frame),
-                )
+            emit("transaction_start", index=index, edge_offset=edge_absolute, evidence_offset=evidence_absolute, edge_rows=len(edge_frame), evidence_rows=len(evidence_frame))
+            transaction_started = time.monotonic()
             with _transaction_atomic():
+                emit("edge_upsert_start", index=index, edge_offset=edge_absolute, evidence_offset=evidence_absolute, edge_rows=len(edge_frame))
+                operation_started = time.monotonic()
                 edge_upserts = _bulk_upsert_rows(KGEdge, "edge_key", edge_frame, _edge_defaults, update_fields=EDGE_UPDATE_FIELDS, batch_size=batch_size)
+                emit("edge_upsert_complete", index=index, edge_offset=edge_absolute, evidence_offset=evidence_absolute, edge_rows=edge_upserts, details={"duration_seconds": time.monotonic() - operation_started})
+
+                emit("evidence_upsert_start", index=index, edge_offset=edge_absolute, evidence_offset=evidence_absolute, evidence_rows=len(evidence_frame))
+                operation_started = time.monotonic()
                 evidence_upserts = _bulk_upsert_rows(KGEdgeEvidence, "evidence_key", evidence_frame, _evidence_defaults, update_fields=EVIDENCE_UPDATE_FIELDS, batch_size=batch_size)
-                if first_processed_chunk and stage_telemetry is not None:
-                    stage_telemetry.emit(
-                        "transaction_upsert_complete",
-                        edge_offset=edge_absolute,
-                        evidence_offset=evidence_absolute,
-                        edge_rows=edge_upserts,
-                        evidence_rows=evidence_upserts,
-                    )
-                    stage_telemetry.emit(
-                        "selected_live_verification_start",
-                        edge_offset=edge_absolute,
-                        evidence_offset=evidence_absolute,
-                        edge_rows=len(edge_frame),
-                        evidence_rows=len(evidence_frame),
-                    )
+                emit("evidence_upsert_complete", index=index, edge_offset=edge_absolute, evidence_offset=evidence_absolute, evidence_rows=evidence_upserts, details={"duration_seconds": time.monotonic() - operation_started})
+
+                emit("selected_live_verification_start", index=index, edge_offset=edge_absolute, evidence_offset=evidence_absolute, edge_rows=len(edge_frame), evidence_rows=len(evidence_frame))
+                operation_started = time.monotonic()
                 found_edges, edge_mismatches = _verify_selected(KGEdge, "edge_key", edge_frame, ["x_id", "x_type", "y_id", "y_type", "relation", "source", "credibility"], batch_size=batch_size)
                 found_evidence, evidence_mismatches = _verify_selected(KGEdgeEvidence, "evidence_key", evidence_frame, ["edge_key", "x_id", "x_type", "y_id", "y_type", "relation", "source", "source_dataset", "source_record_id", "evidence_score", "predicate", "direction"], batch_size=batch_size)
-                if first_processed_chunk and stage_telemetry is not None:
-                    stage_telemetry.emit(
-                        "selected_live_verification_complete",
-                        edge_offset=edge_absolute,
-                        evidence_offset=evidence_absolute,
-                        edge_rows=found_edges,
-                        evidence_rows=found_evidence,
-                        details={"edge_mismatches": edge_mismatches, "evidence_mismatches": evidence_mismatches},
-                    )
+                emit("selected_live_verification_complete", index=index, edge_offset=edge_absolute, evidence_offset=evidence_absolute, edge_rows=found_edges, evidence_rows=found_evidence, details={"duration_seconds": time.monotonic() - operation_started, "edge_mismatches": edge_mismatches, "evidence_mismatches": evidence_mismatches})
                 if edge_mismatches or evidence_mismatches:
                     raise _VerificationError(f"selected-live mismatch edges={edge_mismatches} evidence={evidence_mismatches}")
+                emit("transaction_commit_start", index=index, edge_offset=edge_absolute, evidence_offset=evidence_absolute, edge_rows=edge_upserts, evidence_rows=evidence_upserts)
+                commit_started = time.monotonic()
+            emit("transaction_commit_complete", index=index, edge_offset=edge_absolute, evidence_offset=evidence_absolute, edge_rows=edge_upserts, evidence_rows=evidence_upserts, details={"duration_seconds": time.monotonic() - commit_started, "transaction_duration_seconds": time.monotonic() - transaction_started})
         except Exception as exc:
             summary.status = "verification_failed"
             summary.status_detail = str(exc)
             summary.source_live_mismatch_count = None if not isinstance(exc, _VerificationError) else 1
             return summary
+
         next_durable_edge = edge_absolute + len(edge_frame) if not edge_frame.empty else durable_edge
         next_durable_evidence = evidence_absolute + len(evidence_frame) if not evidence_frame.empty else durable_evidence
         elapsed_seconds = time.monotonic() - started_at
-        chunk = LiveEdgeSyncChunk(
-            run_id=run_id,
-            record_id=f"{run_id}:{window.relation}:pass-{sync_pass_index}:{index}:{edge_absolute}:{evidence_absolute}",
-            relation=window.relation,
-            source_edge_offset=window.edge_offset,
-            source_edge_limit=window.edge_limit,
-            source_evidence_offset=window.evidence_offset,
-            source_evidence_limit=window.evidence_limit,
-            sync_pass_index=sync_pass_index,
-            chunk_index=index,
-            edge_offset=edge_absolute,
-            edge_limit=len(edge_frame),
-            evidence_offset=evidence_absolute,
-            evidence_limit=len(evidence_frame),
-            edge_rows_available=edge_total,
-            edge_rows_selected=len(edge_frame),
-            evidence_rows_available=evidence_total,
-            evidence_rows_selected=len(evidence_frame),
-            edge_upserts=edge_upserts,
-            evidence_upserts=evidence_upserts,
-            durable_edge_current_offset=next_durable_edge,
-            durable_evidence_current_offset=next_durable_evidence,
-            last_progress_at=datetime.now(timezone.utc).isoformat(),
-            elapsed_seconds=elapsed_seconds,
-            edge_rows_per_second=len(edge_frame) / elapsed_seconds if elapsed_seconds else None,
-            evidence_rows_per_second=len(evidence_frame) / elapsed_seconds if elapsed_seconds else None,
-            **_telemetry_metrics(),
-            status="selected-live-verified",
-        )
+        chunk = LiveEdgeSyncChunk(run_id=run_id, record_id=f"{run_id}:{window.relation}:pass-{sync_pass_index}:{index}:{edge_absolute}:{evidence_absolute}", relation=window.relation, source_edge_offset=window.edge_offset, source_edge_limit=window.edge_limit, source_evidence_offset=window.evidence_offset, source_evidence_limit=window.evidence_limit, sync_pass_index=sync_pass_index, chunk_index=index, edge_offset=edge_absolute, edge_limit=len(edge_frame), evidence_offset=evidence_absolute, evidence_limit=len(evidence_frame), edge_rows_available=edge_total, edge_rows_selected=len(edge_frame), evidence_rows_available=evidence_total, evidence_rows_selected=len(evidence_frame), edge_upserts=edge_upserts, evidence_upserts=evidence_upserts, durable_edge_current_offset=next_durable_edge, durable_evidence_current_offset=next_durable_evidence, last_progress_at=datetime.now(timezone.utc).isoformat(), elapsed_seconds=elapsed_seconds, edge_rows_per_second=len(edge_frame) / elapsed_seconds if elapsed_seconds else None, evidence_rows_per_second=len(evidence_frame) / elapsed_seconds if elapsed_seconds else None, **_telemetry_metrics(), status="selected-live-verified")
         if telemetry_path is not None:
             try:
                 stage_callback = None
-                if first_processed_chunk and stage_telemetry is not None:
-                    stage_callback = lambda stage: stage_telemetry.emit(
-                        stage,
-                        edge_offset=edge_absolute,
-                        evidence_offset=evidence_absolute,
-                        edge_rows=len(edge_frame),
-                        evidence_rows=len(evidence_frame),
-                    )
+                if stage_telemetry is not None:
+                    stage_callback = lambda stage, details=None: emit(stage, index=index, edge_offset=edge_absolute, evidence_offset=evidence_absolute, edge_rows=len(edge_frame), evidence_rows=len(evidence_frame), details=details)
                 _append_durable_telemetry(telemetry_path, asdict(chunk), on_stage=stage_callback)
             except (_TelemetryDurabilityError, OSError, ValueError) as exc:
                 summary.status = "telemetry_failed"
                 summary.status_detail = str(exc)
                 return summary
-        # Advance cursors only after selected-live verification and telemetry acknowledgement.
+
         durable_edge, durable_evidence = next_durable_edge, next_durable_evidence
         summary.chunks.append(chunk)
         summary.edge_upserts += edge_upserts
@@ -807,6 +773,7 @@ def _sync_relation_pass(*, kg_root: str | Path, window: RelationWindow, write: b
         summary.durable_edge_current_offset = durable_edge
         summary.durable_evidence_current_offset = durable_evidence
         processed += 1
+
     summary.status = "bounded live sync verified" if summary.chunks else "no_verified_subchunks"
     return summary
 
@@ -865,7 +832,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--verify-selected-live", action="store_true")
     parser.add_argument("--progress-jsonl")
     parser.add_argument("--run-id", help="stable operator-supplied identity persisted on every telemetry record")
-    parser.add_argument("--task-id", help="operator task identity persisted in first-chunk stage telemetry")
+    parser.add_argument("--task-id", help="operator task identity persisted in per-chunk stage telemetry")
     parser.add_argument("--lamin-instance", default=_EXPECTED_INSTANCE)
     parser.add_argument("--write", action="store_true")
     parser.add_argument("--json", action="store_true")

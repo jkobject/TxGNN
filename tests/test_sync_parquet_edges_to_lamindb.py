@@ -3,6 +3,7 @@ from __future__ import annotations
 import contextlib
 import json
 import os
+import sqlite3
 import subprocess
 import threading
 from pathlib import Path
@@ -162,15 +163,24 @@ def test_first_chunk_stage_telemetry_is_atomic_and_precedes_verification(tmp_pat
     stages = [record["stage"] for record in stage_payload["records"]]
     expected = [
         "iterator_window_initialization",
+        "edge_iterator_next_start",
         "edge_row_group_seek",
         "edge_first_row_group_yield",
+        "edge_iterator_next_complete",
+        "evidence_iterator_next_start",
         "evidence_row_group_seek",
         "evidence_first_row_group_yield",
-        "first_chunk_materialized",
-        "transaction_upsert_start",
-        "transaction_upsert_complete",
+        "evidence_iterator_next_complete",
+        "chunk_materialized",
+        "transaction_start",
+        "edge_upsert_start",
+        "edge_upsert_complete",
+        "evidence_upsert_start",
+        "evidence_upsert_complete",
         "selected_live_verification_start",
         "selected_live_verification_complete",
+        "transaction_commit_start",
+        "transaction_commit_complete",
         "progress_flush_fsync_start",
         "progress_flush_fsync_complete",
         "ack_flush_fsync_start",
@@ -181,6 +191,8 @@ def test_first_chunk_stage_telemetry_is_atomic_and_precedes_verification(tmp_pat
         for field in (
             "timestamp",
             "stage",
+            "stage_sequence",
+            "chunk_index",
             "edge_offset",
             "evidence_offset",
             "edge_rows",
@@ -195,6 +207,146 @@ def test_first_chunk_stage_telemetry_is_atomic_and_precedes_verification(tmp_pat
         ):
             assert field in record
     assert not list(tmp_path.glob("*.pending"))
+
+
+def test_stage_telemetry_identifies_every_chunk_and_independent_offsets(tmp_path: Path, monkeypatch) -> None:
+    _fixture(tmp_path, edges=6, evidence=5, row_group_size=3)
+    _fake_lamin(monkeypatch)
+    telemetry = tmp_path / "progress.jsonl"
+
+    result = sync.sync_relation_to_lamindb(
+        kg_root=tmp_path,
+        relation=REL,
+        edge_limit=6,
+        evidence_limit=5,
+        chunk_size=2,
+        write=True,
+        verify_selected_live=True,
+        telemetry_path=telemetry,
+        run_id="t_fixture-three-chunks",
+    )
+
+    assert result.status == "bounded live sync verified"
+    assert [chunk.chunk_index for chunk in result.chunks] == [0, 1, 2]
+    payload = json.loads(sync._stage_path_for(telemetry).read_text())
+    assert payload["active_chunk_index"] == 2
+    assert payload["active_stage"] == "ack_flush_fsync_complete"
+    assert {record["chunk_index"] for record in payload["records"]} == {2}
+    assert {record["edge_offset"] for record in payload["records"]} == {4}
+    assert {record["evidence_offset"] for record in payload["records"]} == {4}
+    stages = [record["stage"] for record in payload["records"]]
+    assert stages == [
+        "edge_iterator_next_start",
+        "edge_iterator_next_complete",
+        "evidence_iterator_next_start",
+        "evidence_iterator_next_complete",
+        "chunk_materialized",
+        "transaction_start",
+        "edge_upsert_start",
+        "edge_upsert_complete",
+        "evidence_upsert_start",
+        "evidence_upsert_complete",
+        "selected_live_verification_start",
+        "selected_live_verification_complete",
+        "transaction_commit_start",
+        "transaction_commit_complete",
+        "progress_flush_fsync_start",
+        "progress_flush_fsync_complete",
+        "ack_flush_fsync_start",
+        "ack_flush_fsync_complete",
+    ]
+    completed = [record for record in payload["records"] if record["stage"].endswith("_complete")]
+    assert completed
+    assert all(record["details"]["duration_seconds"] >= 0 for record in completed)
+
+
+def test_second_chunk_stall_stage_cannot_be_misclassified_as_prior_ack(tmp_path: Path, monkeypatch) -> None:
+    _fixture(tmp_path, edges=6, evidence=6, row_group_size=2)
+    _fake_lamin(monkeypatch)
+    telemetry = tmp_path / "progress.jsonl"
+    original = sync._bulk_upsert_rows
+    calls = 0
+
+    def stall_on_second_chunk_edge(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        if calls == 3:
+            payload = json.loads(sync._stage_path_for(telemetry).read_text())
+            assert payload["active_chunk_index"] == 1
+            assert payload["active_stage"] == "edge_upsert_start"
+            current = payload["records"][-1]
+            assert (current["edge_offset"], current["evidence_offset"]) == (2, 2)
+            raise RuntimeError("deterministic second-chunk stall")
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(sync, "_bulk_upsert_rows", stall_on_second_chunk_edge)
+    result = sync.sync_relation_to_lamindb(
+        kg_root=tmp_path,
+        relation=REL,
+        edge_limit=6,
+        evidence_limit=6,
+        chunk_size=2,
+        write=True,
+        verify_selected_live=True,
+        telemetry_path=telemetry,
+        run_id="t_fixture-second-chunk-stall",
+    )
+
+    assert result.status == "verification_failed"
+    assert result.status_detail == "deterministic second-chunk stall"
+    assert [chunk.chunk_index for chunk in result.chunks] == [0]
+    assert result.durable_edge_current_offset == result.durable_evidence_current_offset == 2
+
+
+def test_three_chunk_sqlite_commit_boundaries_are_timed_without_prefetch(tmp_path: Path, monkeypatch) -> None:
+    _fixture(tmp_path, edges=6, evidence=6, row_group_size=2)
+    _fake_lamin(monkeypatch)
+    telemetry = tmp_path / "progress.jsonl"
+    database = sqlite3.connect(":memory:")
+    database.execute("CREATE TABLE commits (chunk INTEGER)")
+    transformed_edges: list[list[str]] = []
+    original_transform = sync._transform_edge
+    commit_index = 0
+
+    @contextlib.contextmanager
+    def sqlite_transaction():
+        nonlocal commit_index
+        database.execute("BEGIN")
+        try:
+            yield
+            database.execute("INSERT INTO commits VALUES (?)", (commit_index,))
+            database.commit()
+            commit_index += 1
+        except BaseException:
+            database.rollback()
+            raise
+
+    def track_transform(batch):
+        frame = original_transform(batch)
+        transformed_edges.append(frame["x_id"].tolist())
+        return frame
+
+    monkeypatch.setattr(sync, "_transaction_atomic", sqlite_transaction)
+    monkeypatch.setattr(sync, "_transform_edge", track_transform)
+    result = sync.sync_relation_to_lamindb(
+        kg_root=tmp_path,
+        relation=REL,
+        edge_limit=6,
+        evidence_limit=6,
+        chunk_size=2,
+        write=True,
+        verify_selected_live=True,
+        telemetry_path=telemetry,
+        run_id="t_fixture-sqlite-three-chunks",
+    )
+
+    assert result.status == "bounded live sync verified"
+    assert database.execute("SELECT chunk FROM commits ORDER BY chunk").fetchall() == [(0,), (1,), (2,)]
+    assert transformed_edges == [["G:0", "G:1"], ["G:2", "G:3"], ["G:4", "G:5"]]
+    payload = json.loads(sync._stage_path_for(telemetry).read_text())
+    commit_stages = [record for record in payload["records"] if record["stage"].startswith("transaction_commit_")]
+    assert [record["stage"] for record in commit_stages] == ["transaction_commit_start", "transaction_commit_complete"]
+    assert commit_stages[-1]["details"]["duration_seconds"] >= 0
 
 
 def test_stage_telemetry_fsync_failure_stops_before_upsert(tmp_path: Path, monkeypatch) -> None:
@@ -253,6 +405,10 @@ def test_resume_seeks_directly_to_unacknowledged_chunk_without_transforming_pref
     assert transformed_edge_ids == [["G:4", "G:5"]]
     assert result.chunks[0].chunk_index == 2
     assert result.durable_edge_current_offset == result.durable_evidence_current_offset == 6
+    stage_payload = json.loads(sync._stage_path_for(tmp_path / "progress.jsonl").read_text())
+    assert stage_payload["active_chunk_index"] == 2
+    assert {record["edge_offset"] for record in stage_payload["records"]} == {4}
+    assert {record["evidence_offset"] for record in stage_payload["records"]} == {4}
 
 
 def test_max_chunks_does_not_prefetch_or_transform_the_next_chunk(tmp_path: Path, monkeypatch) -> None:
