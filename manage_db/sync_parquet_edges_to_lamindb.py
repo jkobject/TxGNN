@@ -20,7 +20,7 @@ import threading
 import time
 import uuid
 from dataclasses import asdict, dataclass, field
-from itertools import zip_longest
+from itertools import islice, zip_longest
 from pathlib import Path
 from typing import Any, Callable, Iterable, Iterator, Mapping, Sequence
 
@@ -39,6 +39,8 @@ DEFAULT_CHUNK_SIZE = 5_000
 DEFAULT_BATCH_SIZE = 1_000
 DEFAULT_SOURCE_BATCH_SIZE = 65_536
 _EXPECTED_INSTANCE = "jkobject/jouvencekb"
+_STAGE_FSYNC = os.fsync
+_STAGE_REPLACE = os.replace
 
 EDGE_UPDATE_FIELDS = ["x_id", "x_type", "y_id", "y_type", "relation", "display_relation", "source", "credibility", "metadata"]
 EVIDENCE_UPDATE_FIELDS = ["edge_key", "relation", "x_id", "x_type", "y_id", "y_type", "evidence_type", "source", "source_dataset", "source_record_id", "paper_id", "dataset_id", "study_id", "evidence_score", "predicate", "direction", "metadata"]
@@ -288,7 +290,17 @@ def _transform_evidence(batch: pa.RecordBatch, absolute_offset: int) -> pd.DataF
     return frame[["evidence_key", *kg_edge_pilot.EVIDENCE_BASE_COLUMNS, "metadata_json"]]
 
 
-def _iter_selected_batches(kg_root: str | Path, subdir: str, relation: str, *, offset: int, limit: int, chunk_size: int, transform: Callable[[pa.RecordBatch, int], pd.DataFrame]) -> Iterator[tuple[int, pd.DataFrame]]:
+def _iter_selected_batches(
+    kg_root: str | Path,
+    subdir: str,
+    relation: str,
+    *,
+    offset: int,
+    limit: int,
+    chunk_size: int,
+    transform: Callable[[pa.RecordBatch, int], pd.DataFrame],
+    on_first_source_stage: Callable[[str, Mapping[str, Any]], None] | None = None,
+) -> Iterator[tuple[int, pd.DataFrame]]:
     if offset < 0 or limit < 0 or chunk_size <= 0:
         raise ValueError("offset/limit/chunk_size must be non-negative and chunk_size > 0")
     root = kg_storage.open_kg_root(str(kg_root))
@@ -298,22 +310,65 @@ def _iter_selected_batches(kg_root: str | Path, subdir: str, relation: str, *, o
     remaining_offset, remaining_limit, absolute = offset, (None if limit == 0 else limit), offset
     with root.fs.open(path, "rb") as handle:
         parquet = pq.ParquetFile(handle)
-        for batch in parquet.iter_batches(batch_size=min(DEFAULT_SOURCE_BATCH_SIZE, chunk_size)):
+        first_selected_row_group = True
+        first_yield = True
+        buffered_batches: list[pa.RecordBatch] = []
+        buffered_rows = 0
+        for row_group_index in range(parquet.metadata.num_row_groups):
             if remaining_limit == 0:
                 break
-            length = batch.num_rows
-            if remaining_offset >= length:
-                remaining_offset -= length
+            row_group_rows = parquet.metadata.row_group(row_group_index).num_rows
+            if remaining_offset >= row_group_rows:
+                remaining_offset -= row_group_rows
                 continue
-            start = remaining_offset
-            take = length - start if remaining_limit is None else min(length - start, remaining_limit)
-            if take:
-                sliced = batch.slice(start, take)
-                yield absolute, transform(sliced, absolute)
-                absolute += take
-                if remaining_limit is not None:
-                    remaining_limit -= take
-            remaining_offset = 0
+            if first_selected_row_group and on_first_source_stage is not None:
+                on_first_source_stage(
+                    f"{subdir.removesuffix('s')}_row_group_seek",
+                    {
+                        "row_group_index": row_group_index,
+                        "row_group_rows": row_group_rows,
+                        "offset_within_row_group": remaining_offset,
+                    },
+                )
+            first_selected_row_group = False
+            for batch in parquet.iter_batches(
+                batch_size=min(DEFAULT_SOURCE_BATCH_SIZE, chunk_size),
+                row_groups=[row_group_index],
+            ):
+                if remaining_limit == 0:
+                    break
+                length = batch.num_rows
+                if remaining_offset >= length:
+                    remaining_offset -= length
+                    continue
+                start = remaining_offset
+                take = length - start if remaining_limit is None else min(length - start, remaining_limit)
+                if take:
+                    sliced = batch.slice(start, take)
+                    if first_yield and on_first_source_stage is not None:
+                        on_first_source_stage(
+                            f"{subdir.removesuffix('s')}_first_row_group_yield",
+                            {"row_group_index": row_group_index, "rows": take},
+                        )
+                    first_yield = False
+                    consumed = 0
+                    while consumed < take:
+                        piece_rows = min(chunk_size - buffered_rows, take - consumed)
+                        buffered_batches.append(sliced.slice(consumed, piece_rows))
+                        buffered_rows += piece_rows
+                        consumed += piece_rows
+                        if buffered_rows == chunk_size:
+                            combined = pa.Table.from_batches(buffered_batches).combine_chunks().to_batches(max_chunksize=chunk_size)[0]
+                            yield absolute, transform(combined, absolute)
+                            absolute += buffered_rows
+                            buffered_batches = []
+                            buffered_rows = 0
+                    if remaining_limit is not None:
+                        remaining_limit -= take
+                remaining_offset = 0
+        if buffered_rows:
+            combined = pa.Table.from_batches(buffered_batches).combine_chunks().to_batches(max_chunksize=buffered_rows)[0]
+            yield absolute, transform(combined, absolute)
 
 
 def build_edge_frame(kg_root: str | Path, relation: str, *, limit: int, offset: int = 0) -> tuple[pd.DataFrame, int]:
@@ -389,6 +444,93 @@ def _telemetry_metrics() -> dict[str, Any]:
     }
 
 
+def _stage_path_for(telemetry_path: Path) -> Path:
+    return telemetry_path.with_suffix(f"{telemetry_path.suffix}.stages.json")
+
+
+def _fsync_stage_directory(path: Path) -> None:
+    flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+    directory_fd = os.open(path, flags)
+    try:
+        _STAGE_FSYNC(directory_fd)
+    finally:
+        os.close(directory_fd)
+
+
+class _FirstChunkStageTelemetry:
+    """Atomically persist the active stage until the first chunk is acknowledged."""
+
+    def __init__(
+        self,
+        *,
+        telemetry_path: Path,
+        kg_root: str | Path,
+        window: RelationWindow,
+        lamin_instance: str,
+        task_id: str,
+        run_id: str,
+    ) -> None:
+        self.path = _stage_path_for(telemetry_path)
+        self.source_identity = {
+            "root": str(kg_root),
+            "relation": window.relation,
+            "edge_uri": f"{str(kg_root).rstrip('/')}/edges/{window.relation}.parquet",
+            "evidence_uri": f"{str(kg_root).rstrip('/')}/evidence/{window.relation}.parquet",
+        }
+        self.window = window
+        self.lamin_instance = lamin_instance
+        self.task_id = task_id
+        self.run_id = run_id
+        self.records: list[dict[str, Any]] = []
+
+    def emit(
+        self,
+        stage: str,
+        *,
+        edge_offset: int,
+        evidence_offset: int,
+        edge_rows: int = 0,
+        evidence_rows: int = 0,
+        details: Mapping[str, Any] | None = None,
+    ) -> None:
+        record = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "stage": stage,
+            "edge_offset": edge_offset,
+            "evidence_offset": evidence_offset,
+            "edge_rows": edge_rows,
+            "evidence_rows": evidence_rows,
+            "source_identity": self.source_identity,
+            "lamin_instance": self.lamin_instance,
+            "task_id": self.task_id,
+            "run_id": self.run_id,
+            **_telemetry_metrics(),
+        }
+        if details:
+            record["details"] = dict(details)
+        self.records.append(record)
+        payload = {
+            "schema_version": 1,
+            "active_stage": stage,
+            "records": self.records,
+        }
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        pending = self.path.with_name(f".{self.path.name}.{uuid.uuid4().hex}.pending")
+        try:
+            with pending.open("w", encoding="utf-8") as handle:
+                json.dump(payload, handle, indent=2, sort_keys=True)
+                handle.write("\n")
+                handle.flush()
+                _STAGE_FSYNC(handle.fileno())
+            _STAGE_REPLACE(pending, self.path)
+            _fsync_stage_directory(self.path.parent)
+        except OSError as exc:
+            pending.unlink(missing_ok=True)
+            raise _TelemetryDurabilityError(
+                f"first-chunk stage telemetry failed for {self.path.resolve()}: {exc}"
+            ) from exc
+
+
 def _ack_path_for(telemetry_path: Path) -> Path:
     return telemetry_path.with_suffix(f"{telemetry_path.suffix}.ack.jsonl")
 
@@ -403,7 +545,12 @@ def _fsync_directory(path: Path) -> None:
         os.close(directory_fd)
 
 
-def _append_durable_telemetry(path: Path, payload: Mapping[str, Any]) -> dict[str, Any]:
+def _append_durable_telemetry(
+    path: Path,
+    payload: Mapping[str, Any],
+    *,
+    on_stage: Callable[[str], None] | None = None,
+) -> dict[str, Any]:
     """Persist a subchunk record then a separately fsynced acknowledgement.
 
     The acknowledgement is written only after the telemetry record's successful
@@ -418,10 +565,14 @@ def _append_durable_telemetry(path: Path, payload: Mapping[str, Any]) -> dict[st
     record["record_sha256"] = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
     encoded = json.dumps(record, sort_keys=True) + "\n"
     try:
+        if on_stage is not None:
+            on_stage("progress_flush_fsync_start")
         with path.open("a", encoding="utf-8") as handle:
             handle.write(encoded)
             handle.flush()
             os.fsync(handle.fileno())
+        if on_stage is not None:
+            on_stage("progress_flush_fsync_complete")
     except OSError as exc:
         raise _TelemetryDurabilityError(f"telemetry fsync failed for {path.resolve()}: {exc}") from exc
 
@@ -439,12 +590,16 @@ def _append_durable_telemetry(path: Path, payload: Mapping[str, Any]) -> dict[st
     existing_acknowledgements = ack_path.read_text(encoding="utf-8") if ack_path.exists() else ""
     pending_ack_path = ack_path.with_suffix(f"{ack_path.suffix}.{record['record_id']}.pending")
     try:
+        if on_stage is not None:
+            on_stage("ack_flush_fsync_start")
         with pending_ack_path.open("w", encoding="utf-8") as handle:
             handle.write(existing_acknowledgements + ack_encoded)
             handle.flush()
             os.fsync(handle.fileno())
         os.replace(pending_ack_path, ack_path)
         _fsync_directory(ack_path.parent)
+        if on_stage is not None:
+            on_stage("ack_flush_fsync_complete")
     except OSError as exc:
         # Before replace, a pending file is cleaned up.  After replace, an ack
         # can be visible but is intentionally unaccepted if the directory fsync
@@ -455,44 +610,137 @@ def _append_durable_telemetry(path: Path, payload: Mapping[str, Any]) -> dict[st
     return acknowledgement
 
 
-def _sync_relation_pass(*, kg_root: str | Path, window: RelationWindow, write: bool, resume_chunk: int, max_chunks: int | None, batch_size: int, verify_selected_live: bool, telemetry_path: Path | None, run_id: str, sync_pass_index: int = 0, _token: object | None = None) -> LiveEdgeSyncSummary:
+def _sync_relation_pass(*, kg_root: str | Path, window: RelationWindow, write: bool, resume_chunk: int, max_chunks: int | None, batch_size: int, verify_selected_live: bool, telemetry_path: Path | None, run_id: str, task_id: str | None = None, lamin_instance: str = _EXPECTED_INSTANCE, sync_pass_index: int = 0, _token: object | None = None) -> LiveEdgeSyncSummary:
     if resume_chunk < 0:
         raise ValueError("resume_chunk must be >= 0")
     if write and (not verify_selected_live or not _has_active_writer_capability(_token)):
         raise RuntimeError("fail closed: writes require selected-live verification and an active writer capability")
+    effective_task_id = task_id or run_id.split("-", 1)[0]
+    stage_telemetry = None
+    if write and telemetry_path is not None:
+        stage_telemetry = _FirstChunkStageTelemetry(
+            telemetry_path=telemetry_path,
+            kg_root=kg_root,
+            window=window,
+            lamin_instance=lamin_instance,
+            task_id=effective_task_id,
+            run_id=run_id,
+        )
+        stage_telemetry.emit(
+            "iterator_window_initialization",
+            edge_offset=window.edge_offset,
+            evidence_offset=window.evidence_offset,
+            details={
+                "edge_limit": window.edge_limit,
+                "evidence_limit": window.evidence_limit,
+                "chunk_size": window.chunk_size,
+                "resume_chunk": resume_chunk,
+            },
+        )
     _, edge_total = _parquet_metadata(kg_root, "edges", window.relation)
     _, evidence_total = _parquet_metadata(kg_root, "evidence", window.relation)
     summary = LiveEdgeSyncSummary(relation=window.relation, edge_offset=window.edge_offset, edge_limit=window.edge_limit, evidence_offset=window.evidence_offset, evidence_limit=window.evidence_limit, chunk_size=window.chunk_size, resume_chunk=resume_chunk, max_chunks=max_chunks, edge_rows_available=edge_total, evidence_rows_available=evidence_total, edge_rows_selected=_selected_count(edge_total, window.edge_offset, window.edge_limit), evidence_rows_selected=_selected_count(evidence_total, window.evidence_offset, window.evidence_limit))
     if not write:
         return summary
-    edge_iter = _iter_selected_batches(kg_root, "edges", window.relation, offset=window.edge_offset, limit=window.edge_limit, chunk_size=window.chunk_size, transform=lambda b, _: _transform_edge(b))
-    evidence_iter = _iter_selected_batches(kg_root, "evidence", window.relation, offset=window.evidence_offset, limit=window.evidence_limit, chunk_size=window.chunk_size, transform=_transform_evidence)
+    edge_resume_rows = min(resume_chunk * window.chunk_size, summary.edge_rows_selected)
+    evidence_resume_rows = min(resume_chunk * window.chunk_size, summary.evidence_rows_selected)
+    edge_start = window.edge_offset + edge_resume_rows
+    evidence_start = window.evidence_offset + evidence_resume_rows
+    edge_remaining_limit = 0 if window.edge_limit == 0 else max(0, window.edge_limit - edge_resume_rows)
+    evidence_remaining_limit = 0 if window.evidence_limit == 0 else max(0, window.evidence_limit - evidence_resume_rows)
+
+    def source_stage(stage: str, details: Mapping[str, Any]) -> None:
+        if stage_telemetry is not None:
+            rows = int(details.get("rows", 0))
+            stage_telemetry.emit(
+                stage,
+                edge_offset=edge_start,
+                evidence_offset=evidence_start,
+                edge_rows=rows if stage.startswith("edge_") else 0,
+                evidence_rows=rows if stage.startswith("evidence_") else 0,
+                details=details,
+            )
+
+    edge_iter = iter(()) if window.edge_limit > 0 and edge_remaining_limit == 0 else _iter_selected_batches(
+        kg_root,
+        "edges",
+        window.relation,
+        offset=edge_start,
+        limit=edge_remaining_limit,
+        chunk_size=window.chunk_size,
+        transform=lambda b, _: _transform_edge(b),
+        on_first_source_stage=source_stage,
+    )
+    evidence_iter = iter(()) if window.evidence_limit > 0 and evidence_remaining_limit == 0 else _iter_selected_batches(
+        kg_root,
+        "evidence",
+        window.relation,
+        offset=evidence_start,
+        limit=evidence_remaining_limit,
+        chunk_size=window.chunk_size,
+        transform=_transform_evidence,
+        on_first_source_stage=source_stage,
+    )
     KGEdge, KGEdgeEvidence = _registry_models()
-    durable_edge, durable_evidence = window.edge_offset, window.evidence_offset
+    durable_edge, durable_evidence = edge_start, evidence_start
     processed = 0
     started_at = time.monotonic()
-    for index, pair in enumerate(zip_longest(edge_iter, evidence_iter, fillvalue=None)):
-        if index < resume_chunk:
-            for item in pair:
-                if item is not None:
-                    absolute, frame = item
-                    if frame is not None:
-                        if item is pair[0]: durable_edge = absolute + len(frame)
-                        else: durable_evidence = absolute + len(frame)
-            continue
-        if max_chunks is not None and processed >= max_chunks:
-            break
+    pairs: Iterable[tuple[tuple[int, pd.DataFrame] | None, tuple[int, pd.DataFrame] | None]] = zip_longest(edge_iter, evidence_iter, fillvalue=None)
+    if max_chunks is not None:
+        pairs = islice(pairs, max_chunks)
+    for index, pair in enumerate(pairs, start=resume_chunk):
         edge_item, evidence_item = pair
         edge_absolute, edge_frame = edge_item if edge_item is not None else (durable_edge, _empty_edge_frame())
         evidence_absolute, evidence_frame = evidence_item if evidence_item is not None else (durable_evidence, _empty_evidence_frame())
         if edge_frame.empty and evidence_frame.empty:
             continue
+        first_processed_chunk = processed == 0
+        if first_processed_chunk and stage_telemetry is not None:
+            stage_telemetry.emit(
+                "first_chunk_materialized",
+                edge_offset=edge_absolute,
+                evidence_offset=evidence_absolute,
+                edge_rows=len(edge_frame),
+                evidence_rows=len(evidence_frame),
+            )
         try:
+            if first_processed_chunk and stage_telemetry is not None:
+                stage_telemetry.emit(
+                    "transaction_upsert_start",
+                    edge_offset=edge_absolute,
+                    evidence_offset=evidence_absolute,
+                    edge_rows=len(edge_frame),
+                    evidence_rows=len(evidence_frame),
+                )
             with _transaction_atomic():
                 edge_upserts = _bulk_upsert_rows(KGEdge, "edge_key", edge_frame, _edge_defaults, update_fields=EDGE_UPDATE_FIELDS, batch_size=batch_size)
                 evidence_upserts = _bulk_upsert_rows(KGEdgeEvidence, "evidence_key", evidence_frame, _evidence_defaults, update_fields=EVIDENCE_UPDATE_FIELDS, batch_size=batch_size)
+                if first_processed_chunk and stage_telemetry is not None:
+                    stage_telemetry.emit(
+                        "transaction_upsert_complete",
+                        edge_offset=edge_absolute,
+                        evidence_offset=evidence_absolute,
+                        edge_rows=edge_upserts,
+                        evidence_rows=evidence_upserts,
+                    )
+                    stage_telemetry.emit(
+                        "selected_live_verification_start",
+                        edge_offset=edge_absolute,
+                        evidence_offset=evidence_absolute,
+                        edge_rows=len(edge_frame),
+                        evidence_rows=len(evidence_frame),
+                    )
                 found_edges, edge_mismatches = _verify_selected(KGEdge, "edge_key", edge_frame, ["x_id", "x_type", "y_id", "y_type", "relation", "source", "credibility"], batch_size=batch_size)
                 found_evidence, evidence_mismatches = _verify_selected(KGEdgeEvidence, "evidence_key", evidence_frame, ["edge_key", "x_id", "x_type", "y_id", "y_type", "relation", "source", "source_dataset", "source_record_id", "evidence_score", "predicate", "direction"], batch_size=batch_size)
+                if first_processed_chunk and stage_telemetry is not None:
+                    stage_telemetry.emit(
+                        "selected_live_verification_complete",
+                        edge_offset=edge_absolute,
+                        evidence_offset=evidence_absolute,
+                        edge_rows=found_edges,
+                        evidence_rows=found_evidence,
+                        details={"edge_mismatches": edge_mismatches, "evidence_mismatches": evidence_mismatches},
+                    )
                 if edge_mismatches or evidence_mismatches:
                     raise _VerificationError(f"selected-live mismatch edges={edge_mismatches} evidence={evidence_mismatches}")
         except Exception as exc:
@@ -534,7 +782,16 @@ def _sync_relation_pass(*, kg_root: str | Path, window: RelationWindow, write: b
         )
         if telemetry_path is not None:
             try:
-                _append_durable_telemetry(telemetry_path, asdict(chunk))
+                stage_callback = None
+                if first_processed_chunk and stage_telemetry is not None:
+                    stage_callback = lambda stage: stage_telemetry.emit(
+                        stage,
+                        edge_offset=edge_absolute,
+                        evidence_offset=evidence_absolute,
+                        edge_rows=len(edge_frame),
+                        evidence_rows=len(evidence_frame),
+                    )
+                _append_durable_telemetry(telemetry_path, asdict(chunk), on_stage=stage_callback)
             except (_TelemetryDurabilityError, OSError, ValueError) as exc:
                 summary.status = "telemetry_failed"
                 summary.status_detail = str(exc)
@@ -555,17 +812,17 @@ def _sync_relation_pass(*, kg_root: str | Path, window: RelationWindow, write: b
 
 
 def _sync_relation_with_token(*, lamin_instance: str, token: object, **kwargs: Any) -> LiveEdgeSyncSummary:
-    return _sync_relation_pass(_token=token, **kwargs)
+    return _sync_relation_pass(_token=token, lamin_instance=lamin_instance, **kwargs)
 
 
-def sync_relation_to_lamindb(*, kg_root: str | Path, relation: str, edge_limit: int = DEFAULT_EDGE_LIMIT, evidence_limit: int = DEFAULT_EVIDENCE_LIMIT, edge_offset: int = 0, evidence_offset: int = 0, chunk_size: int = DEFAULT_CHUNK_SIZE, resume_chunk: int = 0, max_chunks: int | None = None, batch_size: int = DEFAULT_BATCH_SIZE, lamin_instance: str = _EXPECTED_INSTANCE, write: bool = False, idempotence_passes: int = 1, verify_selected_live: bool = False, telemetry_path: str | Path | None = None, run_id: str | None = None) -> LiveEdgeSyncSummary:
+def sync_relation_to_lamindb(*, kg_root: str | Path, relation: str, edge_limit: int = DEFAULT_EDGE_LIMIT, evidence_limit: int = DEFAULT_EVIDENCE_LIMIT, edge_offset: int = 0, evidence_offset: int = 0, chunk_size: int = DEFAULT_CHUNK_SIZE, resume_chunk: int = 0, max_chunks: int | None = None, batch_size: int = DEFAULT_BATCH_SIZE, lamin_instance: str = _EXPECTED_INSTANCE, write: bool = False, idempotence_passes: int = 1, verify_selected_live: bool = False, telemetry_path: str | Path | None = None, run_id: str | None = None, task_id: str | None = None) -> LiveEdgeSyncSummary:
     if idempotence_passes < 1:
         raise ValueError("idempotence_passes must be >= 1")
     window = RelationWindow(relation, edge_offset, edge_limit, evidence_offset, evidence_limit, chunk_size)
     effective_run_id = run_id or uuid.uuid4().hex
     if not effective_run_id.strip():
         raise ValueError("run_id must be non-empty")
-    common: dict[str, Any] = dict(kg_root=kg_root, window=window, write=write, resume_chunk=resume_chunk, max_chunks=max_chunks, batch_size=batch_size, verify_selected_live=verify_selected_live, telemetry_path=Path(telemetry_path) if telemetry_path else None, run_id=effective_run_id, sync_pass_index=0)
+    common: dict[str, Any] = dict(kg_root=kg_root, window=window, write=write, resume_chunk=resume_chunk, max_chunks=max_chunks, batch_size=batch_size, verify_selected_live=verify_selected_live, telemetry_path=Path(telemetry_path) if telemetry_path else None, run_id=effective_run_id, task_id=task_id, sync_pass_index=0)
     if not write:
         return _sync_relation_pass(**common)
     if not verify_selected_live:
@@ -608,6 +865,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--verify-selected-live", action="store_true")
     parser.add_argument("--progress-jsonl")
     parser.add_argument("--run-id", help="stable operator-supplied identity persisted on every telemetry record")
+    parser.add_argument("--task-id", help="operator task identity persisted in first-chunk stage telemetry")
     parser.add_argument("--lamin-instance", default=_EXPECTED_INSTANCE)
     parser.add_argument("--write", action="store_true")
     parser.add_argument("--json", action="store_true")
@@ -616,7 +874,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    summaries = sync_parquet_edges_to_lamindb(args.kg_root, relations=args.relations or list(DEFAULT_RELATIONS), edge_offset=args.edge_offset, edge_limit=args.edge_limit, evidence_offset=args.evidence_offset, evidence_limit=args.evidence_limit, chunk_size=args.chunk_size, resume_chunk=args.resume_chunk, max_chunks=args.max_chunks, batch_size=args.batch_size, verify_selected_live=args.verify_selected_live, telemetry_path=args.progress_jsonl, run_id=args.run_id, lamin_instance=args.lamin_instance, write=args.write)
+    summaries = sync_parquet_edges_to_lamindb(args.kg_root, relations=args.relations or list(DEFAULT_RELATIONS), edge_offset=args.edge_offset, edge_limit=args.edge_limit, evidence_offset=args.evidence_offset, evidence_limit=args.evidence_limit, chunk_size=args.chunk_size, resume_chunk=args.resume_chunk, max_chunks=args.max_chunks, batch_size=args.batch_size, verify_selected_live=args.verify_selected_live, telemetry_path=args.progress_jsonl, run_id=args.run_id, task_id=args.task_id, lamin_instance=args.lamin_instance, write=args.write)
     print(summaries_to_json(summaries) if args.json else pd.DataFrame([asdict(item) for item in summaries]).to_string(index=False))
     return 0
 
