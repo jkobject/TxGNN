@@ -480,9 +480,23 @@ class _ChunkStageTelemetry:
         self.lamin_instance = lamin_instance
         self.task_id = task_id
         self.run_id = run_id
+        self.stage_identity = {
+            "source_identity": self.source_identity,
+            "source_window": asdict(window),
+            "lamin_instance": lamin_instance,
+            "task_id": task_id,
+            "run_id": run_id,
+        }
+        canonical_identity = json.dumps(
+            self.stage_identity, sort_keys=True, separators=(",", ":")
+        )
+        self.stage_identity_sha256 = hashlib.sha256(
+            canonical_identity.encode("utf-8")
+        ).hexdigest()
         self.records: list[dict[str, Any]] = []
         self.active_chunk_index: int | None = None
         self.stage_sequence = 0
+        self.previous_stage_sequence_sha256: str | None = None
 
     def emit(
         self,
@@ -499,6 +513,23 @@ class _ChunkStageTelemetry:
             self.active_chunk_index = chunk_index
             self.records = []
         self.stage_sequence += 1
+        stage_sequence_identity = {
+            "stage_identity_sha256": self.stage_identity_sha256,
+            "previous_stage_sequence_sha256": self.previous_stage_sequence_sha256,
+            "stage_sequence": self.stage_sequence,
+            "stage": stage,
+            "chunk_index": chunk_index,
+            "edge_offset": edge_offset,
+            "evidence_offset": evidence_offset,
+            "edge_rows": edge_rows,
+            "evidence_rows": evidence_rows,
+        }
+        canonical_sequence = json.dumps(
+            stage_sequence_identity, sort_keys=True, separators=(",", ":")
+        )
+        stage_sequence_sha256 = hashlib.sha256(
+            canonical_sequence.encode("utf-8")
+        ).hexdigest()
         record = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "stage": stage,
@@ -509,6 +540,10 @@ class _ChunkStageTelemetry:
             "edge_rows": edge_rows,
             "evidence_rows": evidence_rows,
             "source_identity": self.source_identity,
+            "stage_identity": self.stage_identity,
+            "stage_identity_sha256": self.stage_identity_sha256,
+            "stage_sequence_identity": stage_sequence_identity,
+            "stage_sequence_sha256": stage_sequence_sha256,
             "lamin_instance": self.lamin_instance,
             "task_id": self.task_id,
             "run_id": self.run_id,
@@ -517,8 +552,9 @@ class _ChunkStageTelemetry:
         if details:
             record["details"] = dict(details)
         self.records.append(record)
+        self.previous_stage_sequence_sha256 = stage_sequence_sha256
         payload = {
-            "schema_version": 2,
+            "schema_version": 3,
             "active_chunk_index": chunk_index,
             "active_stage": stage,
             "records": self.records,

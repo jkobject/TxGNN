@@ -160,6 +160,7 @@ def test_first_chunk_stage_telemetry_is_atomic_and_precedes_verification(tmp_pat
 
     assert result.status == "bounded live sync verified"
     stage_payload = json.loads(sync._stage_path_for(telemetry).read_text())
+    assert stage_payload["schema_version"] == 3
     stages = [record["stage"] for record in stage_payload["records"]]
     expected = [
         "iterator_window_initialization",
@@ -201,11 +202,31 @@ def test_first_chunk_stage_telemetry_is_atomic_and_precedes_verification(tmp_pat
             "disk_free_bytes",
             "iowait_seconds",
             "source_identity",
+            "stage_identity",
+            "stage_identity_sha256",
+            "stage_sequence_identity",
+            "stage_sequence_sha256",
             "lamin_instance",
             "task_id",
             "run_id",
         ):
             assert field in record
+        canonical_identity = json.dumps(
+            record["stage_identity"], sort_keys=True, separators=(",", ":")
+        )
+        assert record["stage_identity_sha256"] == sync.hashlib.sha256(
+            canonical_identity.encode("utf-8")
+        ).hexdigest()
+        canonical_sequence = json.dumps(
+            record["stage_sequence_identity"], sort_keys=True, separators=(",", ":")
+        )
+        assert record["stage_sequence_sha256"] == sync.hashlib.sha256(
+            canonical_sequence.encode("utf-8")
+        ).hexdigest()
+        assert (
+            record["stage_sequence_identity"]["stage_identity_sha256"]
+            == record["stage_identity_sha256"]
+        )
     assert not list(tmp_path.glob("*.pending"))
 
 
