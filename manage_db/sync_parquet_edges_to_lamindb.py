@@ -11,6 +11,7 @@ import contextlib
 from datetime import datetime, timezone
 import hashlib
 import json
+import math
 import os
 import platform
 import resource
@@ -122,6 +123,237 @@ class _VerificationError(RuntimeError):
 
 class _TelemetryDurabilityError(RuntimeError):
     pass
+
+
+class _EtaAdmissionError(RuntimeError):
+    """Timing evidence is not safe or comparable enough for writer admission."""
+
+
+@dataclass(frozen=True)
+class EtaAdmissionDecision:
+    admitted: bool
+    reason: str
+    acknowledged_records: int
+    recent_intervals: int
+    recent_interval_mean_seconds: float
+    remaining_chunks: int
+    projected_writer_hours: float
+    writer_budget_hours: float
+    preflight_reserve_hours: float
+    checkpoint_reserve_hours: float
+
+
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for block in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def _require_manifest_binding(manifest_path: Path, paths: Sequence[Path]) -> None:
+    if not manifest_path.is_file():
+        raise _EtaAdmissionError("SHA256 manifest is missing")
+    bindings: dict[str, str] = {}
+    for line in manifest_path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        parts = line.split(maxsplit=1)
+        if len(parts) != 2:
+            raise _EtaAdmissionError("SHA256 manifest contains an invalid row")
+        claimed, name = parts[0], parts[1].lstrip("* ")
+        if name in bindings:
+            raise _EtaAdmissionError("SHA256 manifest contains a duplicate path")
+        bindings[name] = claimed
+    for path in paths:
+        candidates = [digest for name, digest in bindings.items() if Path(name).name == path.name]
+        if len(candidates) != 1:
+            raise _EtaAdmissionError(f"timing input has no unique manifest binding: {path.name}")
+        claimed = candidates[0]
+        if claimed is None or claimed != _sha256_file(path):
+            raise _EtaAdmissionError(f"timing input is not hash-bound: {path.name}")
+
+
+def _read_jsonl_strict(path: Path, label: str) -> list[dict[str, Any]]:
+    if not path.is_file():
+        raise _EtaAdmissionError(f"{label} JSONL is missing")
+    rows: list[dict[str, Any]] = []
+    try:
+        for line in path.read_text(encoding="utf-8").splitlines():
+            if line.strip():
+                value = json.loads(line)
+                if not isinstance(value, dict):
+                    raise TypeError("JSONL row is not an object")
+                rows.append(value)
+    except (OSError, TypeError, json.JSONDecodeError) as exc:
+        raise _EtaAdmissionError(f"{label} JSONL is invalid") from exc
+    if not rows:
+        raise _EtaAdmissionError(f"{label} JSONL is empty")
+    return rows
+
+
+def evaluate_eta_admission(
+    *,
+    progress_path: str | Path,
+    acknowledgement_path: str | Path,
+    sha256_manifest_path: str | Path,
+    expected_manifest_sha256: str,
+    expected_run_id: str,
+    expected_relation: str,
+    expected_start_offset: int,
+    expected_next_offset: int,
+    remaining_edge_rows: int,
+    remaining_evidence_rows: int,
+    chunk_size: int,
+    lifecycle_seconds: float,
+    preflight_reserve_seconds: float,
+    checkpoint_reserve_seconds: float,
+    recent_intervals: int = 10,
+    max_age_seconds: float = 2 * 86_400,
+    now: datetime | None = None,
+) -> EtaAdmissionDecision:
+    """Fail closed unless immutable acknowledged timing supports a lifecycle ETA.
+
+    This function is intended for the launcher preflight, before it persists or
+    executes a LIVE writer command.  An over-budget but otherwise valid packet
+    returns a rejected decision; malformed or incomparable evidence raises.
+    """
+
+    progress = Path(progress_path)
+    acknowledgements = Path(acknowledgement_path)
+    manifest = Path(sha256_manifest_path)
+    if (
+        not manifest.is_file()
+        or len(expected_manifest_sha256) != 64
+        or _sha256_file(manifest) != expected_manifest_sha256
+    ):
+        raise _EtaAdmissionError("SHA256 manifest does not match its immutable trust root")
+    _require_manifest_binding(manifest, [progress, acknowledgements])
+    records = _read_jsonl_strict(progress, "progress")
+    acks = _read_jsonl_strict(acknowledgements, "acknowledgement")
+    if chunk_size <= 0 or recent_intervals <= 0:
+        raise _EtaAdmissionError("chunk size and recent interval count must be positive")
+    if min(remaining_edge_rows, remaining_evidence_rows) < 0:
+        raise _EtaAdmissionError("remaining row counts must be non-negative")
+    writer_budget = lifecycle_seconds - preflight_reserve_seconds - checkpoint_reserve_seconds
+    if writer_budget <= 0 or min(preflight_reserve_seconds, checkpoint_reserve_seconds) < 0:
+        raise _EtaAdmissionError("lifecycle reserves leave no positive writer budget")
+    if len(records) < recent_intervals + 1:
+        raise _EtaAdmissionError("timing evidence is too sparse")
+
+    by_identity: dict[tuple[Any, Any], dict[str, Any]] = {}
+    for record in records:
+        identity = (record.get("run_id"), record.get("record_id"))
+        if identity in by_identity:
+            raise _EtaAdmissionError("duplicate progress identity")
+        by_identity[identity] = record
+    seen_acks: set[tuple[Any, Any]] = set()
+    acknowledged: list[dict[str, Any]] = []
+    for ack in acks:
+        identity = (ack.get("run_id"), ack.get("record_id"))
+        if identity in seen_acks:
+            raise _EtaAdmissionError("duplicate acknowledgement identity")
+        seen_acks.add(identity)
+        record = by_identity.get(identity)
+        if record is None:
+            raise _EtaAdmissionError("orphan acknowledgement")
+        bare = dict(record)
+        claimed = bare.pop("record_sha256", None)
+        computed = hashlib.sha256(
+            json.dumps(bare, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        ).hexdigest()
+        if not (
+            ack.get("fsync_success") is True
+            and ack.get("record_sha256") == claimed == computed
+        ):
+            raise _EtaAdmissionError("progress acknowledgement is not fsync/hash-bound")
+        acknowledged.append(record)
+    if set(by_identity) != seen_acks:
+        raise _EtaAdmissionError("progress record lacks a matching acknowledgement")
+
+    acknowledged.sort(key=lambda row: int(row.get("chunk_index", -1)))
+    timestamps: list[datetime] = []
+    elapsed_values: list[float] = []
+    for index, record in enumerate(acknowledged):
+        source_offset = expected_start_offset + index * chunk_size
+        durable_offset = source_offset + chunk_size
+        complete = (
+            record.get("run_id") == expected_run_id
+            and record.get("relation") == expected_relation
+            and record.get("sync_pass_index") == 0
+            and record.get("chunk_index") == index
+            and record.get("edge_offset") == source_offset
+            and record.get("evidence_offset") == source_offset
+            and record.get("durable_edge_current_offset") == durable_offset
+            and record.get("durable_evidence_current_offset") == durable_offset
+            and record.get("edge_limit") == chunk_size
+            and record.get("evidence_limit") == chunk_size
+            and record.get("edge_rows_selected") == chunk_size
+            and record.get("evidence_rows_selected") == chunk_size
+            and record.get("edge_upserts") == chunk_size
+            and record.get("evidence_upserts") == chunk_size
+            and record.get("source_edge_offset") == expected_start_offset
+            and record.get("source_evidence_offset") == expected_start_offset
+            and record.get("source_edge_limit") == record.get("source_evidence_limit")
+            and record.get("status") == "selected-live-verified"
+        )
+        if not complete:
+            raise _EtaAdmissionError("timing identity/window is incomplete or noncontiguous")
+        try:
+            timestamp = datetime.fromisoformat(str(record["last_progress_at"]))
+        except (KeyError, TypeError, ValueError) as exc:
+            raise _EtaAdmissionError("progress timestamp is invalid") from exc
+        if timestamp.tzinfo is None:
+            raise _EtaAdmissionError("progress timestamp must be timezone-aware")
+        timestamps.append(timestamp)
+        elapsed = record.get("elapsed_seconds")
+        if (
+            not isinstance(elapsed, (int, float))
+            or isinstance(elapsed, bool)
+            or not math.isfinite(float(elapsed))
+        ):
+            raise _EtaAdmissionError("progress elapsed time is invalid")
+        elapsed_values.append(float(elapsed))
+    if acknowledged[-1].get("durable_edge_current_offset") != expected_next_offset:
+        raise _EtaAdmissionError("acknowledged timing does not end at the no-replay offset")
+    if any(later <= earlier for earlier, later in zip(timestamps, timestamps[1:])):
+        raise _EtaAdmissionError("progress timestamps are not strictly increasing")
+    if any(later <= earlier for earlier, later in zip(elapsed_values, elapsed_values[1:])):
+        raise _EtaAdmissionError("progress elapsed times are not strictly increasing")
+    current_time = now or datetime.now(timezone.utc)
+    if current_time.tzinfo is None:
+        raise _EtaAdmissionError("admission time must be timezone-aware")
+    age_seconds = (current_time - timestamps[-1]).total_seconds()
+    if age_seconds < 0 or age_seconds > max_age_seconds:
+        raise _EtaAdmissionError("timing evidence is stale or from the future")
+
+    intervals = [
+        later - earlier
+        for earlier, later in zip(elapsed_values, elapsed_values[1:])
+    ][-recent_intervals:]
+    mean_seconds = sum(intervals) / len(intervals)
+    remaining_chunks = max(
+        math.ceil(remaining_edge_rows / chunk_size),
+        math.ceil(remaining_evidence_rows / chunk_size),
+    )
+    projected_seconds = mean_seconds * remaining_chunks
+    admitted = projected_seconds <= writer_budget
+    return EtaAdmissionDecision(
+        admitted=admitted,
+        reason=(
+            "projected writer time fits reserved lifecycle budget"
+            if admitted
+            else "projected writer time exceeds reserved lifecycle budget"
+        ),
+        acknowledged_records=len(acknowledged),
+        recent_intervals=len(intervals),
+        recent_interval_mean_seconds=mean_seconds,
+        remaining_chunks=remaining_chunks,
+        projected_writer_hours=projected_seconds / 3_600,
+        writer_budget_hours=writer_budget / 3_600,
+        preflight_reserve_hours=preflight_reserve_seconds / 3_600,
+        checkpoint_reserve_hours=checkpoint_reserve_seconds / 3_600,
+    )
 
 
 @dataclass(frozen=True)
@@ -395,9 +627,39 @@ def _bulk_upsert_rows(model: Any, key_field: str, frame: pd.DataFrame, defaults_
     records = _clean_records(frame, defaults_fn, key_field)
     if not records:
         return 0
-    objects = [model(**record) for record in records]
-    _db_retry(f"bulk upsert {model.__name__}", lambda: model.objects.bulk_create(objects, batch_size=batch_size, update_conflicts=True, update_fields=list(update_fields), unique_fields=[key_field]))
-    return len(objects)
+    keys = [str(record[key_field]) for record in records]
+    existing = {
+        str(row[key_field])
+        for row in _fetch_by_keys(
+            model,
+            key_field,
+            keys,
+            [key_field],
+            batch_size=batch_size,
+        )
+    }
+    fresh_objects = [model(**record) for record in records if str(record[key_field]) not in existing]
+    existing_objects = [model(**record) for record in records if str(record[key_field]) in existing]
+    if fresh_objects:
+        # The host-global writer capability makes this preselection exclusive.
+        # A non-cooperating concurrent insert still fails the transaction closed;
+        # it is never hidden behind ignore_conflicts or retry/replay behavior.
+        _db_retry(
+            f"bulk insert fresh {model.__name__}",
+            lambda: model.objects.bulk_create(fresh_objects, batch_size=batch_size),
+        )
+    if existing_objects:
+        _db_retry(
+            f"bulk update existing {model.__name__}",
+            lambda: model.objects.bulk_create(
+                existing_objects,
+                batch_size=batch_size,
+                update_conflicts=True,
+                update_fields=list(update_fields),
+                unique_fields=[key_field],
+            ),
+        )
+    return len(records)
 
 
 def _fetch_by_keys(model: Any, key_field: str, keys: Sequence[str], values: Sequence[str], *, batch_size: int) -> list[dict[str, Any]]:

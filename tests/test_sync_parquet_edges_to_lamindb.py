@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import contextlib
+from datetime import datetime, timedelta, timezone
+import hashlib
 import json
 import os
 import sqlite3
@@ -36,11 +38,17 @@ class Query:
 
 
 class Manager:
-    def __init__(self): self.records: dict[str, dict[str, Any]] = {}
-    def bulk_create(self, objects, *, batch_size, update_conflicts, update_fields, unique_fields):
-        assert update_conflicts
+    def __init__(self):
+        self.records: dict[str, dict[str, Any]] = {}
+        self.bulk_calls: list[dict[str, Any]] = []
+    def bulk_create(self, objects, *, batch_size, update_conflicts=False, update_fields=None, unique_fields=None):
+        self.bulk_calls.append({"rows": len(objects), "batch_size": batch_size, "update_conflicts": update_conflicts})
+        key_field = unique_fields[0] if unique_fields else ("evidence_key" if hasattr(objects[0], "evidence_key") else "edge_key")
         for obj in objects:
-            self.records[vars(obj)[unique_fields[0]]] = dict(vars(obj))
+            key = vars(obj)[key_field]
+            if key in self.records and not update_conflicts:
+                raise AssertionError("plain create attempted an existing key")
+            self.records[key] = dict(vars(obj))
         return objects
     def filter(self, **lookups):
         rows = list(self.records.values())
@@ -696,6 +704,182 @@ def test_committed_telemetry_contains_independent_progress_contract(tmp_path: Pa
     assert payload["durable_edge_current_offset"] == payload["durable_evidence_current_offset"] == 1
     for field in ("record_id", "record_sha256", "source_edge_offset", "source_edge_limit", "source_evidence_offset", "source_evidence_limit", "last_progress_at", "elapsed_seconds", "edge_rows_per_second", "evidence_rows_per_second", "process_rss_bytes", "disk_free_bytes", "iowait_seconds", "iowait_status"):
         assert field in payload
+
+
+def test_fresh_keys_use_plain_bulk_create_while_idempotent_pass_updates_existing(tmp_path: Path, monkeypatch) -> None:
+    _fixture(tmp_path)
+    _fake_lamin(monkeypatch)
+
+    result = sync.sync_relation_to_lamindb(
+        kg_root=tmp_path,
+        relation=REL,
+        edge_limit=2,
+        evidence_limit=2,
+        chunk_size=2,
+        batch_size=1,
+        write=True,
+        verify_selected_live=True,
+        telemetry_path=tmp_path / "progress.jsonl",
+        run_id="optimized-fresh-insert",
+        idempotence_passes=2,
+    )
+
+    assert result.status == "bounded live sync verified"
+    assert [call["update_conflicts"] for call in Edge.objects.bulk_calls] == [False, True]
+    assert [call["update_conflicts"] for call in Evidence.objects.bulk_calls] == [False, True]
+    assert all(call["batch_size"] == 1 for call in Edge.objects.bulk_calls + Evidence.objects.bulk_calls)
+    assert len(Edge.objects.records) == len(Evidence.objects.records) == 2
+
+
+def _eta_packet(
+    root: Path,
+    *,
+    interval_seconds: float,
+    records: int = 11,
+    run_id: str = "sealed-run",
+    relation: str = "enhancer_regulates_gene",
+    start: int = 13_950_000,
+    gap_at: int | None = None,
+    now: datetime | None = None,
+) -> tuple[Path, Path, Path, datetime]:
+    now = now or datetime(2026, 7, 18, 12, tzinfo=timezone.utc)
+    first = now - timedelta(seconds=interval_seconds * (records - 1) + 60)
+    progress_path = root / "progress.jsonl"
+    ack_path = root / "progress.jsonl.ack.jsonl"
+    progress_rows = []
+    ack_rows = []
+    for index in range(records):
+        source_offset = start + index * 5_000
+        durable_offset = source_offset + 5_000
+        if gap_at == index:
+            source_offset += 5_000
+            durable_offset += 5_000
+        record = {
+            "chunk_index": index,
+            "durable_edge_current_offset": durable_offset,
+            "durable_evidence_current_offset": durable_offset,
+            "edge_offset": source_offset,
+            "edge_limit": 5_000,
+            "edge_rows_selected": 5_000,
+            "edge_upserts": 5_000,
+            "evidence_offset": source_offset,
+            "evidence_limit": 5_000,
+            "evidence_rows_selected": 5_000,
+            "evidence_upserts": 5_000,
+            "elapsed_seconds": interval_seconds * (index + 1),
+            "last_progress_at": (first + timedelta(seconds=index * interval_seconds)).isoformat(),
+            "record_id": f"{run_id}:{relation}:pass-0:{index}:{source_offset}:{source_offset}",
+            "relation": relation,
+            "run_id": run_id,
+            "source_edge_limit": records * 5_000,
+            "source_edge_offset": start,
+            "source_evidence_limit": records * 5_000,
+            "source_evidence_offset": start,
+            "status": "selected-live-verified",
+            "sync_pass_index": 0,
+        }
+        canonical = json.dumps(record, sort_keys=True, separators=(",", ":"))
+        record["record_sha256"] = hashlib.sha256(canonical.encode()).hexdigest()
+        progress_rows.append(record)
+        ack_rows.append({
+            "acknowledged_at": record["last_progress_at"],
+            "fsync_success": True,
+            "record_id": record["record_id"],
+            "record_sha256": record["record_sha256"],
+            "run_id": run_id,
+        })
+    progress_path.write_text("".join(json.dumps(row, sort_keys=True) + "\n" for row in progress_rows))
+    ack_path.write_text("".join(json.dumps(row, sort_keys=True) + "\n" for row in ack_rows))
+    manifest_path = root / "SHA256SUMS"
+    manifest_path.write_text(
+        f"{hashlib.sha256(progress_path.read_bytes()).hexdigest()}  sealed/artifacts/{progress_path.name}\n"
+        f"{hashlib.sha256(ack_path.read_bytes()).hexdigest()}  sealed/artifacts/{ack_path.name}\n"
+    )
+    return progress_path, ack_path, manifest_path, now
+
+
+def _evaluate_eta_packet(tmp_path: Path, **packet_kwargs: Any):
+    progress, ack, manifest, now = _eta_packet(tmp_path, **packet_kwargs)
+    return sync.evaluate_eta_admission(
+        progress_path=progress,
+        acknowledgement_path=ack,
+        sha256_manifest_path=manifest,
+        expected_manifest_sha256=hashlib.sha256(manifest.read_bytes()).hexdigest(),
+        expected_run_id="sealed-run",
+        expected_relation="enhancer_regulates_gene",
+        expected_start_offset=13_950_000,
+        expected_next_offset=14_005_000,
+        remaining_edge_rows=830_000,
+        remaining_evidence_rows=830_000,
+        chunk_size=5_000,
+        lifecycle_seconds=14 * 3_600,
+        preflight_reserve_seconds=3_600,
+        checkpoint_reserve_seconds=3_600,
+        recent_intervals=10,
+        max_age_seconds=2 * 86_400,
+        now=now,
+    )
+
+
+def test_eta_admission_rejects_sealed_recent_rate_over_reserved_writer_budget(tmp_path: Path) -> None:
+    decision = _evaluate_eta_packet(tmp_path, interval_seconds=398.1416612935)
+
+    assert decision.admitted is False
+    assert decision.recent_interval_mean_seconds == pytest.approx(398.1416612935)
+    assert decision.remaining_chunks == 166
+    assert decision.projected_writer_hours == pytest.approx(18.358754381866945)
+    assert decision.writer_budget_hours == 12
+    assert decision.reason == "projected writer time exceeds reserved lifecycle budget"
+
+
+def test_eta_admission_accepts_only_complete_evidence_within_reserved_budget(tmp_path: Path) -> None:
+    decision = _evaluate_eta_packet(tmp_path, interval_seconds=200)
+
+    assert decision.admitted is True
+    assert decision.projected_writer_hours == pytest.approx(166 * 200 / 3_600)
+
+
+@pytest.mark.parametrize("corruption", ["tampered", "sparse", "mismatched_run", "stale", "noncontiguous", "non_hash_bound", "manifest_tampered"])
+def test_eta_admission_fails_closed_on_invalid_timing_identity(tmp_path: Path, corruption: str) -> None:
+    kwargs: dict[str, Any] = {"interval_seconds": 200}
+    if corruption == "sparse":
+        kwargs["records"] = 10
+    elif corruption == "mismatched_run":
+        kwargs["run_id"] = "other-run"
+    elif corruption == "stale":
+        kwargs["now"] = datetime(2026, 7, 15, 12, tzinfo=timezone.utc)
+    elif corruption == "noncontiguous":
+        kwargs["gap_at"] = 5
+    progress, ack, manifest, packet_now = _eta_packet(tmp_path, **kwargs)
+    expected_manifest_sha256 = hashlib.sha256(manifest.read_bytes()).hexdigest()
+    if corruption == "tampered":
+        progress.write_text(progress.read_text().replace('"edge_upserts": 5000', '"edge_upserts": 4999', 1))
+    elif corruption == "non_hash_bound":
+        manifest.write_text(("0" * 64) + f"  sealed/artifacts/{progress.name}\n" + manifest.read_text().splitlines(keepends=True)[1])
+    elif corruption == "manifest_tampered":
+        manifest.write_text(manifest.read_text() + "\n")
+    now = packet_now + timedelta(days=3) if corruption == "stale" else packet_now
+
+    with pytest.raises(sync._EtaAdmissionError):
+        sync.evaluate_eta_admission(
+            progress_path=progress,
+            acknowledgement_path=ack,
+            sha256_manifest_path=manifest,
+            expected_manifest_sha256=expected_manifest_sha256,
+            expected_run_id="sealed-run",
+            expected_relation="enhancer_regulates_gene",
+            expected_start_offset=13_950_000,
+            expected_next_offset=14_005_000,
+            remaining_edge_rows=830_000,
+            remaining_evidence_rows=830_000,
+            chunk_size=5_000,
+            lifecycle_seconds=14 * 3_600,
+            preflight_reserve_seconds=3_600,
+            checkpoint_reserve_seconds=3_600,
+            recent_intervals=10,
+            max_age_seconds=2 * 86_400,
+            now=now,
+        )
 
 
 def test_idempotence_passes_preserve_run_identity_with_distinct_record_ids(tmp_path: Path, monkeypatch) -> None:
