@@ -20,6 +20,7 @@ EXPECTED = [
     "04_lamindb_equivalent_queries.ipynb",
     "05_sampled_pyg_heterodata.ipynb",
     "06_sampled_ml_use_cases.ipynb",
+    "07_data_inventory_explorer.ipynb",
 ]
 FORBIDDEN = [
     "/Users/jkobject/mnt/gcs",
