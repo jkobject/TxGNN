@@ -31,6 +31,7 @@ def test_data_explorer_is_deterministic_and_bounded(tmp_path: Path) -> None:
     text = "\n".join(str(cell.source) for cell in notebook.cells)
     assert notebook.metadata["jouvence"]["bounded"] is True
     assert notebook.metadata["jouvence"]["read_only"] is True
+    assert notebook.metadata["jouvence"]["data_mode"] == "live-gcs-only"
     assert "canonical-inferred" in text
     assert "non-canonical" in text
     assert "read_bounded_parquet" in text

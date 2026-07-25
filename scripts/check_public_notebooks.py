@@ -64,6 +64,12 @@ def check_notebook(path: Path) -> dict[str, object]:
 
 def execute_notebook(path: Path, destination: Path) -> dict[str, object]:
     notebook = nbformat.read(path, as_version=4)
+    if notebook.metadata.get("jouvence", {}).get("data_mode") == "live-gcs-only":
+        return {
+            "path": str(path.relative_to(ROOT)),
+            "status": "skipped-live-gcs",
+            "reason": "execute explicitly with scripts/check_data_explorer_notebook.py in an authenticated GCS context",
+        }
     client = NotebookClient(
         notebook,
         timeout=180,
