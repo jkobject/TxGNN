@@ -35,7 +35,12 @@ def test_data_explorer_is_deterministic_and_bounded(tmp_path: Path) -> None:
     assert "non-canonical" in text
     assert "read_bounded_parquet" in text
     assert "list_parquet_uris" in text
+    assert "live-gcs-only" in text
     assert "fs.glob(" not in text
+    assert "build_public_fixture" not in text
+    assert "kg-fixture" not in text
+    assert "fixture_rule_engine" not in text
+    assert "JOUVENCE_DATA_MODE" not in text
     assert "SELECTED_URI" in text
     assert "/Users/jkobject/mnt/gcs" not in text
     assert "jkobject-1549353370965" not in text
@@ -45,8 +50,11 @@ def test_data_explorer_is_deterministic_and_bounded(tmp_path: Path) -> None:
 @pytest.mark.parametrize(
     ("variable", "value", "message"),
     [
-        ("JOUVENCE_DATA_MODE", "invalid", "JOUVENCE_DATA_MODE must be fixture or live"),
+        ("JOUVENCE_EXPLORER_SAMPLE_ROWS", "not-an-integer", "must be integers"),
+        ("JOUVENCE_EXPLORER_SAMPLE_ROWS", "0", "must be between 1 and 100"),
         ("JOUVENCE_EXPLORER_SAMPLE_ROWS", "101", "must be between 1 and 100"),
+        ("JOUVENCE_EXPLORER_MAX_FILES", "not-an-integer", "must be integers"),
+        ("JOUVENCE_EXPLORER_MAX_FILES", "0", "must be between 1 and 2000"),
         ("JOUVENCE_EXPLORER_MAX_FILES", "2001", "must be between 1 and 2000"),
     ],
 )
@@ -54,7 +62,7 @@ def test_optimized_python_cannot_remove_safety_bounds(
     variable: str, value: str, message: str
 ) -> None:
     environment = os.environ.copy()
-    environment.update({"PYTHONOPTIMIZE": "1", variable: value})
+    environment.update({"PYTHONOPTIMIZE": "2", variable: value})
     result = subprocess.run(
         [sys.executable, str(ROOT / "scripts" / "check_data_explorer_notebook.py"), "--execute"],
         cwd=ROOT,
@@ -66,27 +74,16 @@ def test_optimized_python_cannot_remove_safety_bounds(
     assert message in result.stdout + result.stderr
 
 
-def test_every_live_gcs_root_requires_billing_project(tmp_path: Path) -> None:
-    environment = os.environ.copy()
-    environment.update(
-        {
-            "JOUVENCE_DATA_MODE": "live",
-            "JOUVENCE_CANONICAL_ROOT": str(tmp_path),
-            "JOUVENCE_STAGING_ROOT": "gs://example-bucket/staging",
-        }
-    )
-    environment.pop("JOUVENCE_BILLING_PROJECT", None)
-    result = subprocess.run(
-        [sys.executable, str(ROOT / "scripts" / "check_data_explorer_notebook.py"), "--execute"],
-        cwd=ROOT,
-        env=environment,
-        text=True,
-        capture_output=True,
-    )
-    assert result.returncode != 0
-    assert "Every configured GCS root requires JOUVENCE_BILLING_PROJECT" in (
-        result.stdout + result.stderr
-    )
+def test_live_only_roots_all_use_requester_pays_project() -> None:
+    notebook = nbformat.read(NOTEBOOK, as_version=4)
+    text = "\n".join(str(cell.source) for cell in notebook.cells)
+
+    assert "canonical_root = PUBLIC_KG_ROOT" in text
+    assert 'staging_root = "gs://jouvencekb/kg/staging"' in text
+    assert "JOUVENCE_CANONICAL_ROOT" not in text
+    assert "JOUVENCE_STAGING_ROOT" not in text
+    assert "billing_project=BILLING_PROJECT" in text
+    assert "_storage_options(uri, BILLING_PROJECT)" in text
 
 
 def test_local_listing_is_early_bounded(
