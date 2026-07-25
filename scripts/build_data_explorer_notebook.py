@@ -1,0 +1,440 @@
+#!/usr/bin/env python3
+"""Build the simple, read-only Jouvence Parquet data explorer notebook."""
+
+from __future__ import annotations
+
+import hashlib
+from pathlib import Path
+
+import nbformat as nbf
+
+ROOT = Path(__file__).resolve().parents[1]
+OUTPUT = ROOT / "notebooks" / "07_data_inventory_explorer.ipynb"
+
+
+def md(text: str):
+    return nbf.v4.new_markdown_cell(text.strip() + "\n")
+
+
+def code(text: str):
+    return nbf.v4.new_code_cell(text.strip() + "\n")
+
+
+def main() -> None:
+    cells = [
+        md("""
+# 07 — Explore the Jouvence data that exist today
+
+This notebook is a **read-only map and inspector**, not a build pipeline. It answers five practical questions:
+
+1. Where are the Parquet files stored?
+2. Which location means canonical, inferred-canonical, staged, or archived?
+3. How do I authenticate and read them without downloading a whole table?
+4. What are the schema, row groups, columns, nulls, and example rows of one selected object?
+5. Where are embeddings and inferred links, and how do I inspect them without confusing them with observations?
+
+Start in `fixture` mode, then switch to `live` only when the bounded examples make sense.
+"""),
+        md("""
+## 1. The storage map
+
+Jouvence uses **location as part of the data contract**:
+
+| Surface | Typical root | Meaning |
+|---|---|---|
+| Canonical observations | `.../kg/v2/nodes`, `edges`, `evidence`, `features` | Reviewed, promoted objects in the canonical data plane |
+| Canonical inferred outputs | `.../kg/v2/edges_inferred`, `evidence_inferred` | Reviewed derived links, kept separate from observations |
+| Non-canonical candidates | `.../kg/staging` and internal `v2/staged`, `v2/staging`, `_promotion_staging` | Candidate, partial, deferred, or pre-promotion artifacts; inspect manifests before interpreting |
+| Archives/backups | `v2/archive`, `_backups`, `_removed_relations_*` | Historical or rollback material, not current data |
+
+**Canonical does not mean biologically true.** It means the object passed the project's promotion/review contract. An inferred edge is still an inference even when stored canonically.
+"""),
+        md("""
+## 2. Access: authentication, authorization, and billing are separate
+
+Live GCS reads use Application Default Credentials (ADC) and a caller-owned requester-pays project:
+
+```bash
+gcloud auth application-default login
+export JOUVENCE_DATA_MODE=live
+export JOUVENCE_BILLING_PROJECT='<your-billing-project>'
+uv run jupyter lab
+```
+
+The identity also needs bucket read permission. ADC alone does not grant authorization. The billing project pays request/egress charges but does not grant access. This notebook never embeds credentials or a maintainer billing project.
+
+For a verified local mount or cache, set `JOUVENCE_CANONICAL_ROOT` and `JOUVENCE_STAGING_ROOT` to local paths. Do not use a broad macOS FUSE scan for heavy work; full inventories and embedding scans belong on the in-region worker.
+"""),
+        code("""
+from __future__ import annotations
+
+import json
+import os
+import sys
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import pyarrow as pa
+import pyarrow.parquet as pq
+from fsspec.core import url_to_fs
+from IPython.display import display
+
+REPO_ROOT = Path.cwd()
+if REPO_ROOT.name == "notebooks":
+    REPO_ROOT = REPO_ROOT.parent
+sys.path.insert(0, str(REPO_ROOT))
+
+from manage_db.public_notebooks import (
+    PUBLIC_KG_ROOT,
+    _storage_options,
+    build_public_fixture,
+    read_bounded_parquet,
+)
+
+MODE = os.environ.get("JOUVENCE_DATA_MODE", "fixture").lower()
+BILLING_PROJECT = os.environ.get("JOUVENCE_BILLING_PROJECT")
+SAMPLE_ROWS = int(os.environ.get("JOUVENCE_EXPLORER_SAMPLE_ROWS", "8"))
+MAX_LISTED = int(os.environ.get("JOUVENCE_EXPLORER_MAX_FILES", "250"))
+assert MODE in {"fixture", "live"}, "JOUVENCE_DATA_MODE must be fixture or live"
+assert 1 <= SAMPLE_ROWS <= 100, "keep interactive samples between 1 and 100 rows"
+assert 1 <= MAX_LISTED <= 2000, "keep displayed inventories bounded"
+"""),
+        md("""
+### Configuration cell
+
+This is the only cell most users need to update. In live mode the canonical default is `gs://jouvencekb/kg/v2`; override roots only when using a verified local mount/cache. The external staging root is deliberately separate from canonical storage.
+"""),
+        code("""
+CACHE = REPO_ROOT / "artifacts" / "cache" / "data-explorer"
+CACHE.mkdir(parents=True, exist_ok=True)
+
+if MODE == "fixture":
+    canonical_root = build_public_fixture(CACHE / "kg-fixture")
+    # Add tiny inferred and staging examples so every section executes offline.
+    inferred_dir = canonical_root / "edges_inferred"
+    inferred_evidence_dir = canonical_root / "evidence_inferred"
+    staging_root = CACHE / "staging-fixture"
+    inferred_dir.mkdir(parents=True, exist_ok=True)
+    inferred_evidence_dir.mkdir(parents=True, exist_ok=True)
+    staging_root.mkdir(parents=True, exist_ok=True)
+    inferred = pd.DataFrame([{
+        "relation": "gene_may_influence_disease", "x_id": "ENSG00000141510",
+        "x_type": "gene", "y_id": "MONDO:0007254", "y_type": "disease",
+        "source": "fixture_rule_engine", "inference_method": "typed_fixture_rule",
+    }])
+    inferred.to_parquet(inferred_dir / "gene_may_influence_disease.parquet", index=False)
+    inferred.assign(source_record_id="fixture:inference:1", confidence=0.8).to_parquet(
+        inferred_evidence_dir / "gene_may_influence_disease.parquet", index=False
+    )
+    pd.DataFrame([{"node_id": "ENSG_STAGED", "status": "candidate"}]).to_parquet(
+        staging_root / "candidate_feature.parquet", index=False
+    )
+else:
+    canonical_root = os.environ.get("JOUVENCE_CANONICAL_ROOT", PUBLIC_KG_ROOT)
+    staging_root = os.environ.get("JOUVENCE_STAGING_ROOT", "gs://jouvencekb/kg/staging")
+    if str(canonical_root).startswith("gs://") and not BILLING_PROJECT:
+        raise RuntimeError(
+            "Live GCS mode requires JOUVENCE_BILLING_PROJECT. "
+            "Use your own billing project; do not put it in this notebook."
+        )
+
+print({
+    "mode": MODE,
+    "canonical_root": str(canonical_root),
+    "staging_root": str(staging_root),
+    "sample_rows": SAMPLE_ROWS,
+    "read_only": True,
+})
+"""),
+        md("""
+## 3. A small, editable source registry
+
+Update this table when a new storage surface is introduced. Status is assigned from the **root and layer**, never guessed from a filename such as `final` or `accepted`.
+"""),
+        code("""
+def join_uri(root, suffix: str) -> str:
+    return f"{str(root).rstrip('/')}/{suffix.strip('/')}"
+
+SURFACES = pd.DataFrame([
+    {"surface": "canonical nodes", "uri": join_uri(canonical_root, "nodes"), "status": "canonical-observed"},
+    {"surface": "canonical edges", "uri": join_uri(canonical_root, "edges"), "status": "canonical-observed"},
+    {"surface": "canonical evidence", "uri": join_uri(canonical_root, "evidence"), "status": "canonical-observed"},
+    {"surface": "canonical features/embeddings", "uri": join_uri(canonical_root, "features"), "status": "canonical-feature"},
+    {"surface": "canonical inferred edges", "uri": join_uri(canonical_root, "edges_inferred"), "status": "canonical-inferred"},
+    {"surface": "canonical inferred evidence", "uri": join_uri(canonical_root, "evidence_inferred"), "status": "canonical-inferred"},
+    {"surface": "internal staged", "uri": join_uri(canonical_root, "staged"), "status": "non-canonical"},
+    {"surface": "internal staging", "uri": join_uri(canonical_root, "staging"), "status": "non-canonical"},
+    {"surface": "promotion staging", "uri": join_uri(canonical_root, "_promotion_staging"), "status": "non-canonical"},
+    {"surface": "external staging", "uri": str(staging_root), "status": "non-canonical"},
+])
+display(SURFACES)
+"""),
+        md("""
+## 4. List Parquet objects without reading their row payloads
+
+Object listing is cheaper than scanning rows, but a recursive cloud listing is still a real request. Results are capped for display. In live mode, inspect one surface at a time and use the in-region worker for exhaustive refreshes.
+"""),
+        code("""
+def list_parquets(uri: str, status: str, surface: str, max_files: int = MAX_LISTED) -> pd.DataFrame:
+    options = _storage_options(uri, BILLING_PROJECT) if uri.startswith("gs://") else {}
+    fs, path = url_to_fs(uri, **options)
+    try:
+        matches = sorted(fs.glob(f"{path.rstrip('/')}/**/*.parquet"))
+    except (FileNotFoundError, OSError):
+        matches = []
+    rows = []
+    for item in matches[:max_files]:
+        protocol = "gs://" if uri.startswith("gs://") else ""
+        rows.append({
+            "status": status,
+            "surface": surface,
+            "uri": protocol + item,
+            "name": Path(item).name,
+        })
+    result = pd.DataFrame(rows, columns=["status", "surface", "uri", "name"])
+    result.attrs["truncated"] = len(matches) > max_files
+    result.attrs["matched"] = len(matches)
+    return result
+
+inventories = []
+for row in SURFACES.itertuples(index=False):
+    frame = list_parquets(row.uri, row.status, row.surface)
+    inventories.append(frame)
+    print(f"{row.surface:28s} {len(frame):4d} displayed / {frame.attrs['matched']:4d} matched"
+          + (" (TRUNCATED)" if frame.attrs["truncated"] else ""))
+inventory = pd.concat(inventories, ignore_index=True)
+display(inventory.head(30))
+"""),
+        md("""
+### Status summary
+
+This count describes discovered **objects**, not biological rows or completion. A staging object may have been promoted elsewhere and retained for provenance. Read its manifest/review before calling it pending work.
+"""),
+        code("""
+status_summary = (
+    inventory.groupby(["status", "surface"], dropna=False)
+    .size().rename("parquet_objects").reset_index()
+    .sort_values(["status", "surface"])
+)
+display(status_summary)
+"""),
+        md("""
+## 5. Select one Parquet and inspect its physical format
+
+Choose any URI from `inventory`. Footer inspection reads schema and row-group metadata without materializing the full table. The default selects a small canonical node table.
+"""),
+        code("""
+preferred = inventory[inventory["surface"].eq("canonical nodes")]
+SELECTED_URI = (
+    preferred.iloc[0]["uri"] if not preferred.empty
+    else inventory.iloc[0]["uri"]
+)
+# To inspect another object, replace the line above, for example:
+# SELECTED_URI = "gs://jouvencekb/kg/v2/edges/disease_associated_gene.parquet"
+print("Selected:", SELECTED_URI)
+"""),
+        code("""
+def parquet_footer(uri: str) -> tuple[pd.DataFrame, pd.DataFrame, dict]:
+    options = _storage_options(uri, BILLING_PROJECT) if uri.startswith("gs://") else {}
+    fs, path = url_to_fs(uri, **options)
+    parquet = pq.ParquetFile(path, filesystem=fs)
+    schema = pd.DataFrame([
+        {"column": field.name, "arrow_type": str(field.type), "nullable": field.nullable}
+        for field in parquet.schema_arrow
+    ])
+    row_groups = pd.DataFrame([
+        {
+            "row_group": i,
+            "rows": parquet.metadata.row_group(i).num_rows,
+            "bytes_uncompressed": parquet.metadata.row_group(i).total_byte_size,
+        }
+        for i in range(parquet.metadata.num_row_groups)
+    ])
+    summary = {
+        "uri": uri,
+        "format": "Apache Parquet",
+        "rows": parquet.metadata.num_rows,
+        "row_groups": parquet.metadata.num_row_groups,
+        "columns": len(parquet.schema_arrow),
+        "created_by": parquet.metadata.created_by,
+        "serialized_footer_bytes": parquet.metadata.serialized_size,
+    }
+    return schema, row_groups, summary
+
+selected_schema, selected_row_groups, selected_summary = parquet_footer(SELECTED_URI)
+print(json.dumps(selected_summary, indent=2, default=str))
+display(selected_schema)
+display(selected_row_groups.head(20))
+"""),
+        md("""
+## 6. Read a bounded sample
+
+`read_bounded_parquet` seeks over row groups and stops at the requested limit. This is materially safer than `pandas.read_parquet(...).head()`, which can load the entire object before truncating.
+"""),
+        code("""
+sample = read_bounded_parquet(
+    SELECTED_URI,
+    limit=SAMPLE_ROWS,
+    billing_project=BILLING_PROJECT,
+)
+print(f"Loaded {len(sample)} rows out of footer count {selected_summary['rows']:,}")
+display(sample)
+"""),
+        code("""
+def sample_diagnostics(frame: pd.DataFrame) -> pd.DataFrame:
+    return pd.DataFrame({
+        "dtype": frame.dtypes.astype(str),
+        "nulls_in_sample": frame.isna().sum(),
+        "distinct_in_sample": frame.nunique(dropna=True),
+        "example": [next((str(v)[:100] for v in frame[c] if pd.notna(v)), "") for c in frame.columns],
+    }).rename_axis("column").reset_index()
+
+display(sample_diagnostics(sample))
+print("These are sample diagnostics, not full-table quality statistics.")
+"""),
+        md("""
+## 7. Explore an observed edge together with its evidence
+
+Observed assertions and their source records are separate Parquets. They join on stable edge identity: `relation, x_id, x_type, y_id, y_type`. Never join by row number.
+"""),
+        code("""
+edge_rows = inventory[inventory["surface"].eq("canonical edges")]
+evidence_rows = inventory[inventory["surface"].eq("canonical evidence")]
+common_relations = sorted(set(edge_rows["name"]) & set(evidence_rows["name"]))
+print("Relations with both discovered edge and evidence objects:", len(common_relations))
+
+if common_relations:
+    relation_file = common_relations[0]
+    edge_uri = edge_rows.loc[edge_rows["name"].eq(relation_file), "uri"].iloc[0]
+    evidence_uri = evidence_rows.loc[evidence_rows["name"].eq(relation_file), "uri"].iloc[0]
+    edge_sample = read_bounded_parquet(edge_uri, limit=SAMPLE_ROWS, billing_project=BILLING_PROJECT)
+    evidence_sample = read_bounded_parquet(evidence_uri, limit=min(100, SAMPLE_ROWS * 5), billing_project=BILLING_PROJECT)
+    keys = ["relation", "x_id", "x_type", "y_id", "y_type"]
+    available_keys = [key for key in keys if key in edge_sample and key in evidence_sample]
+    display(edge_sample)
+    display(evidence_sample)
+    if len(available_keys) == len(keys):
+        display(edge_sample.merge(evidence_sample, on=keys, how="left", suffixes=("_edge", "_evidence")).head(20))
+else:
+    print("No edge/evidence pair exists in this bounded inventory.")
+"""),
+        md("""
+## 8. Find embeddings and inspect vector format
+
+Embeddings may be one Parquet or a sharded directory. Their canonical status comes from storage location. A candidate under staging is not canonical merely because its manifest says `accepted`; promotion and readback are separate gates.
+"""),
+        code("""
+embedding_mask = inventory["uri"].str.contains("embedding", case=False, na=False)
+embedding_objects = inventory.loc[embedding_mask].copy()
+display(embedding_objects.head(50))
+print("Embedding Parquets discovered:", len(embedding_objects))
+"""),
+        code("""
+if not embedding_objects.empty:
+    EMBEDDING_URI = embedding_objects.iloc[0]["uri"]
+    embedding_schema, embedding_row_groups, embedding_summary = parquet_footer(EMBEDDING_URI)
+    embedding_sample = read_bounded_parquet(
+        EMBEDDING_URI, limit=SAMPLE_ROWS, billing_project=BILLING_PROJECT
+    )
+    print(json.dumps(embedding_summary, indent=2, default=str))
+    display(embedding_schema)
+    display(embedding_sample)
+
+    vector_columns = [
+        c for c in embedding_sample.columns
+        if c.lower() in {"embedding", "vector", "features", "x"}
+    ]
+    if vector_columns:
+        column = vector_columns[0]
+        vectors = [np.asarray(v, dtype=np.float32) for v in embedding_sample[column] if v is not None]
+        vector_stats = pd.DataFrame({
+            "dimension": [len(v) for v in vectors],
+            "l2_norm": [float(np.linalg.norm(v)) for v in vectors],
+            "finite": [bool(np.isfinite(v).all()) for v in vectors],
+        })
+        display(vector_stats)
+    else:
+        print("No standard vector column found; inspect the schema/manifest for this embedding format.")
+else:
+    print("No embedding Parquet was discovered in the selected roots.")
+"""),
+        md("""
+Embedding geometry is model- and modality-specific. Similarity is not functional equivalence, causality, or therapeutic evidence. Coverage/missingness must remain explicit; do not replace absent source vectors with unlabeled zero or random vectors.
+"""),
+        md("""
+## 9. Inspect inferred links without mixing them with observations
+
+The two inferred layers intentionally mirror the edge/evidence split. A canonical inferred file is accepted **as an inference product**; it is never silently moved into observed `edges/`.
+"""),
+        code("""
+inferred_edges = inventory[inventory["surface"].eq("canonical inferred edges")]
+inferred_evidence = inventory[inventory["surface"].eq("canonical inferred evidence")]
+display(inferred_edges)
+display(inferred_evidence)
+
+for label, frame in [("inferred edge", inferred_edges), ("inferred evidence", inferred_evidence)]:
+    if not frame.empty:
+        uri = frame.iloc[0]["uri"]
+        print()
+        print(f"{label}: {uri}")
+        display(read_bounded_parquet(uri, limit=SAMPLE_ROWS, billing_project=BILLING_PROJECT))
+"""),
+        md("""
+## 10. What is canonical, what is not, and what is unknown?
+
+- **Canonical observed:** under the accepted `v2/nodes`, `edges`, `evidence`, or `features` surface.
+- **Canonical inferred:** under `v2/edges_inferred` or `v2/evidence_inferred`; still derived rather than observed.
+- **Non-canonical:** under staging surfaces. This includes candidates, deferred products, superseded attempts, and retained promotion inputs.
+- **Unknown from location alone:** whether a staged artifact is pending, rejected, superseded, or retained after successful promotion. Read its immutable manifest and reviewer decision.
+- **Not current:** archive, backup, removal, and rollback prefixes.
+
+This notebook shows **what exists and how it is encoded**. It does not replace the Kanban/review ledger for why an object obtained its status.
+"""),
+        md("""
+## 11. Updating this notebook
+
+1. Add a row to `SURFACES` only when a new storage contract is introduced.
+2. Change `SELECTED_URI` to inspect another object; do not duplicate cells.
+3. Rerun from the top after changing mode or roots.
+4. Regenerate the committed notebook with:
+
+```bash
+uv run python scripts/build_data_explorer_notebook.py
+```
+
+5. Verify the clean source notebook in fixture mode with:
+
+```bash
+env -u JOUVENCE_DATA_MODE -u JOUVENCE_BILLING_PROJECT \
+  uv run python scripts/check_data_explorer_notebook.py --execute
+```
+
+For a live exhaustive inventory or full embedding analysis, create a reviewed worker task rather than increasing notebook limits on a laptop.
+"""),
+    ]
+
+    for index, cell in enumerate(cells):
+        cell["id"] = hashlib.sha256(f"data-explorer:{index}:{cell.cell_type}".encode()).hexdigest()[:12]
+        if cell.cell_type == "code":
+            cell.execution_count = None
+            cell.outputs = []
+
+    notebook = nbf.v4.new_notebook(cells=cells)
+    notebook.metadata = {
+        "kernelspec": {"display_name": "Python 3", "language": "python", "name": "python3"},
+        "language_info": {"name": "python", "version": "3.11"},
+        "jouvence": {
+            "default_mode": "fixture",
+            "bounded": True,
+            "read_only": True,
+            "purpose": "data-inventory-explorer",
+        },
+    }
+    OUTPUT.parent.mkdir(parents=True, exist_ok=True)
+    nbf.write(notebook, OUTPUT)
+    print(f"wrote {OUTPUT.relative_to(ROOT)} ({len(cells)} meaningful cells)")
+
+
+if __name__ == "__main__":
+    main()
