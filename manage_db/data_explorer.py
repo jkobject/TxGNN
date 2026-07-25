@@ -37,12 +37,16 @@ def _bounded(iterable: Iterable[str], limit: int) -> ParquetListing:
     return ParquetListing(tuple(found), truncated=False)
 
 
+def _raise_walk_error(error: OSError) -> None:
+    raise error
+
+
 def _local_parquets(root: Path) -> Iterable[str]:
     """Yield local Parquets deterministically without materializing a full tree."""
 
     if not root.exists():
         return
-    for current, directories, filenames in os.walk(root):
+    for current, directories, filenames in os.walk(root, onerror=_raise_walk_error):
         directories.sort()
         for filename in sorted(filenames):
             if filename.endswith(".parquet"):

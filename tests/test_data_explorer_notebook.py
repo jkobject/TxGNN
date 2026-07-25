@@ -35,7 +35,9 @@ def test_data_explorer_is_deterministic_and_bounded() -> None:
     assert all(not cell.get("outputs") for cell in notebook.cells if cell.cell_type == "code")
 
 
-def test_local_listing_is_early_bounded(tmp_path: Path) -> None:
+def test_local_listing_is_early_bounded(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     for index in range(5):
         path = tmp_path / f"part-{index}.parquet"
         path.write_bytes(b"fixture")
@@ -45,6 +47,15 @@ def test_local_listing_is_early_bounded(tmp_path: Path) -> None:
     assert len(listing.uris) == 2
     assert listing.truncated is True
     assert listing.uris[0].endswith("part-0.parquet")
+
+    def failing_walk(_root, *, onerror):
+        onerror(PermissionError("local denied"))
+        return iter(())
+
+    with monkeypatch.context() as scoped:
+        scoped.setattr(data_explorer.os, "walk", failing_walk)
+        with pytest.raises(PermissionError, match="local denied"):
+            data_explorer.list_parquet_uris(tmp_path, limit=2)
 
 
 def test_gcs_listing_uses_server_side_cap_and_propagates_errors(
