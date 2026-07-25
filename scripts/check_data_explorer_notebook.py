@@ -21,6 +21,8 @@ REQUIRED = [
     "evidence_inferred",
     "JOUVENCE_BILLING_PROJECT",
     "read_bounded_parquet",
+    "list_parquet_uris",
+    "server-side GCS cap",
     "parquet_footer",
     "Embedding Parquets discovered",
     "join on stable edge identity",
@@ -30,6 +32,7 @@ FORBIDDEN = [
     "jkobject-1549353370965",
     "GOOGLE_APPLICATION_CREDENTIALS=",
     "pd.read_parquet(SELECTED_URI)",
+    "fs.glob(",
 ]
 
 

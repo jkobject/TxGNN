@@ -85,6 +85,7 @@ if REPO_ROOT.name == "notebooks":
     REPO_ROOT = REPO_ROOT.parent
 sys.path.insert(0, str(REPO_ROOT))
 
+from manage_db.data_explorer import list_parquet_uris
 from manage_db.public_notebooks import (
     PUBLIC_KG_ROOT,
     _storage_options,
@@ -173,36 +174,31 @@ display(SURFACES)
         md("""
 ## 4. List Parquet objects without reading their row payloads
 
-Object listing is cheaper than scanning rows, but a recursive cloud listing is still a real request. Results are capped for display. In live mode, inspect one surface at a time and use the in-region worker for exhaustive refreshes.
+Object listing is cheaper than scanning rows, but it is still a real request. Each surface uses a **server-side GCS cap of `MAX_LISTED + 1`** (or an early-stopping local walk), so the notebook never materializes an exhaustive cloud listing merely to truncate it afterward. Access/network errors propagate visibly; they are not converted into an empty inventory. The ten configured surfaces require at most one bounded listing request each.
 """),
         code("""
 def list_parquets(uri: str, status: str, surface: str, max_files: int = MAX_LISTED) -> pd.DataFrame:
-    options = _storage_options(uri, BILLING_PROJECT) if uri.startswith("gs://") else {}
-    fs, path = url_to_fs(uri, **options)
-    try:
-        matches = sorted(fs.glob(f"{path.rstrip('/')}/**/*.parquet"))
-    except (FileNotFoundError, OSError):
-        matches = []
-    rows = []
-    for item in matches[:max_files]:
-        protocol = "gs://" if uri.startswith("gs://") else ""
-        rows.append({
-            "status": status,
-            "surface": surface,
-            "uri": protocol + item,
-            "name": Path(item).name,
-        })
+    listing = list_parquet_uris(
+        uri,
+        limit=max_files,
+        billing_project=BILLING_PROJECT,
+    )
+    rows = [{
+        "status": status,
+        "surface": surface,
+        "uri": item,
+        "name": Path(item).name,
+    } for item in listing.uris]
     result = pd.DataFrame(rows, columns=["status", "surface", "uri", "name"])
-    result.attrs["truncated"] = len(matches) > max_files
-    result.attrs["matched"] = len(matches)
+    result.attrs["truncated"] = listing.truncated
     return result
 
 inventories = []
 for row in SURFACES.itertuples(index=False):
     frame = list_parquets(row.uri, row.status, row.surface)
     inventories.append(frame)
-    print(f"{row.surface:28s} {len(frame):4d} displayed / {frame.attrs['matched']:4d} matched"
-          + (" (TRUNCATED)" if frame.attrs["truncated"] else ""))
+    suffix = " (TRUNCATED: at least one additional object)" if frame.attrs["truncated"] else ""
+    print(f"{row.surface:28s} {len(frame):4d} displayed{suffix}")
 inventory = pd.concat(inventories, ignore_index=True)
 display(inventory.head(30))
 """),
