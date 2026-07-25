@@ -6,6 +6,7 @@ import pandas as pd
 
 from manage_db import kg_storage
 from manage_db.sync_parquet_nodes_to_lamindb import (
+    _iter_node_batches,
     _row_to_record_spec,
     main,
     sync_parquet_nodes_to_lamindb,
@@ -50,6 +51,23 @@ def test_row_to_record_spec_maps_supported_custom_records() -> None:
         "uniprot_id": "P51587",
         "refseq_protein": "NP_000050.2",
         "pdb_ids": "1N0W|1N0V",
+    }
+
+    enhancer = _row_to_record_spec(
+        "enhancer",
+        {"id": "EH38E1516972", "chromosome": "chr1", "start": 10, "end": 20},
+    )
+    assert enhancer is not None
+    assert enhancer.registry_name == "lnschema_txgnn.Enhancer"
+    assert enhancer.key_field == "encode_id"
+    assert enhancer.key_value == "EH38E1516972"
+    assert enhancer.create_kwargs == {
+        "encode_id": "EH38E1516972",
+        "ensembl_regulatory_id": None,
+        "encode_experiment_id": None,
+        "chromosome": "chr1",
+        "start_pos": 10,
+        "end_pos": 20,
     }
 
 
@@ -149,6 +167,29 @@ def test_dry_run_without_lamindb_counts_valid_rows_as_would_create(tmp_path: Pat
     assert summaries[0].seen == 2
     assert summaries[0].would_create == 2
     assert summaries[0].created == 0
+
+
+def test_node_batch_iterator_resumes_from_exact_row_offset(tmp_path: Path) -> None:
+    root = kg_storage.open_kg_root(str(tmp_path / "kg"))
+    kg_storage.write_nodes(
+        root,
+        "paper",
+        pd.DataFrame(
+            [
+                {"id": "PMID:1", "doi": None, "pmc_id": None, "arxiv_id": None},
+                {"id": "PMID:2", "doi": None, "pmc_id": None, "arxiv_id": None},
+                {"id": "PMID:3", "doi": None, "pmc_id": None, "arxiv_id": None},
+            ]
+        ),
+    )
+
+    ids = [
+        node_id
+        for batch in _iter_node_batches(root, "paper", batch_size=1, row_offset=1)
+        for node_id in batch["id"].tolist()
+    ]
+
+    assert ids == ["PMID:2", "PMID:3"]
 
 
 

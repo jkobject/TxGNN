@@ -35,6 +35,7 @@ except Exception:  # pragma: no cover - django is available in LaminDB runtime
     OperationalError = Exception  # type: ignore[assignment]
 
 SUPPORTED_NODE_TYPES = {
+    "enhancer",
     "mutation",
     "paper",
     "transcript",
@@ -245,6 +246,34 @@ def _row_to_record_spec(node_type: str, row: Mapping[str, Any]) -> RecordSpec | 
             create_kwargs,
         )
 
+    if node_type == "enhancer":
+        encode_id = node_id if node_id.startswith("EH") else _first_clean(row, ["encode_id"])
+        ensembl_regulatory_id = (
+            node_id if node_id.startswith("ENSR") else _first_clean(row, ["ensembl_regulatory_id"])
+        )
+        if encode_id:
+            key_field, key_value = "encode_id", encode_id
+        elif ensembl_regulatory_id:
+            key_field, key_value = "ensembl_regulatory_id", ensembl_regulatory_id
+        else:
+            return None
+        create_kwargs = {
+            "encode_id": encode_id,
+            "ensembl_regulatory_id": ensembl_regulatory_id,
+            "encode_experiment_id": _first_clean(row, ["encode_experiment_id"]),
+            "chromosome": _first_clean(row, ["chromosome", "chr"]),
+            "start_pos": _clean_int(row.get("start_pos", row.get("start"))),
+            "end_pos": _clean_int(row.get("end_pos", row.get("end"))),
+        }
+        return RecordSpec(
+            node_type,
+            node_id,
+            "lnschema_txgnn.Enhancer",
+            key_field,
+            str(key_value),
+            create_kwargs,
+        )
+
     if node_type == "disease":
         normalized_id = normalize_disease_id(node_id)
         if not normalized_id:
@@ -351,6 +380,13 @@ def _columns_for_node_type(node_type: str) -> list[str]:
             "ref",
             "alt",
             "consequence",
+            "encode_id",
+            "ensembl_regulatory_id",
+            "encode_experiment_id",
+            "start",
+            "end",
+            "start_pos",
+            "end_pos",
         }
     )
     return sorted(cols)
@@ -362,14 +398,28 @@ def _available_columns(path: str, fs) -> set[str]:
         return set(parquet_file.schema_arrow.names)
 
 
-def _iter_node_batches(root: kg_storage.KGRoot, node_type: str, batch_size: int) -> Iterator[pd.DataFrame]:
+def _iter_node_batches(
+    root: kg_storage.KGRoot,
+    node_type: str,
+    batch_size: int,
+    row_offset: int = 0,
+) -> Iterator[pd.DataFrame]:
+    if row_offset < 0:
+        raise ValueError("row_offset must be >= 0")
     path = root._node_internal(node_type)
     wanted = [col for col in _columns_for_node_type(node_type) if col in _available_columns(path, root.fs)]
     if "id" not in wanted:
         raise ValueError(f"nodes/{node_type}.parquet missing required column: id")
     with root.fs.open(path, "rb") as fh:
         parquet_file = pq.ParquetFile(fh)
+        remaining_offset = row_offset
         for record_batch in parquet_file.iter_batches(batch_size=batch_size, columns=wanted):
+            if remaining_offset >= record_batch.num_rows:
+                remaining_offset -= record_batch.num_rows
+                continue
+            if remaining_offset:
+                record_batch = record_batch.slice(remaining_offset)
+                remaining_offset = 0
             yield record_batch.to_pandas()
 
 
@@ -394,6 +444,7 @@ def _registry_models() -> dict[str, Any]:
         "lnschema_txgnn.Paper": txs.Paper,
         "lnschema_txgnn.Transcript": txs.Transcript,
         "lnschema_txgnn.Protein": txs.Protein,
+        "lnschema_txgnn.Enhancer": txs.Enhancer,
     }
 
 
@@ -740,6 +791,7 @@ def sync_parquet_nodes_to_lamindb(
     batch_size: int = DEFAULT_BATCH_SIZE,
     write: bool = False,
     max_rows: int | None = None,
+    row_offset: int = 0,
     bulk_create_batch_size: int = DEFAULT_BULK_CREATE_BATCH_SIZE,
 ) -> list[SyncSummary]:
     """Sync selected KG node Parquets into LaminDB registries.
@@ -781,7 +833,7 @@ def sync_parquet_nodes_to_lamindb(
             continue
         if node_type not in SUPPORTED_NODE_TYPES:
             row_count = 0
-            for batch in _iter_node_batches(root, node_type, batch_size):
+            for batch in _iter_node_batches(root, node_type, batch_size, row_offset=row_offset):
                 row_count += len(batch)
                 if max_rows is not None and row_count >= max_rows:
                     break
@@ -800,7 +852,7 @@ def sync_parquet_nodes_to_lamindb(
         key_field = None
         summary = SyncSummary(node_type=node_type, registry=None, key_field=None)
         processed = 0
-        for batch in _iter_node_batches(root, node_type, batch_size):
+        for batch in _iter_node_batches(root, node_type, batch_size, row_offset=row_offset):
             if max_rows is not None:
                 remaining = max_rows - processed
                 if remaining <= 0:
@@ -875,6 +927,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--lamin-instance", default=None, help="Optional ln.connect(...) instance slug")
     parser.add_argument("--batch-size", type=int, default=DEFAULT_BATCH_SIZE)
     parser.add_argument("--max-rows", type=int, default=None, help="Optional smoke-test row cap per node type")
+    parser.add_argument("--row-offset", type=int, default=0, help="First source row to select per node type")
     parser.add_argument("--bulk-create-batch-size", type=int, default=DEFAULT_BULK_CREATE_BATCH_SIZE)
     parser.add_argument(
         "--write",
@@ -891,6 +944,7 @@ def main(argv: list[str] | None = None) -> int:
         batch_size=args.batch_size,
         write=args.write,
         max_rows=args.max_rows,
+        row_offset=args.row_offset,
         bulk_create_batch_size=args.bulk_create_batch_size,
     )
     if args.json:

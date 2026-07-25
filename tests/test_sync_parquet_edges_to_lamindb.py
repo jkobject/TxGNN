@@ -370,6 +370,30 @@ def test_live_sync_handles_relation_without_evidence_file(tmp_path: Path, monkey
     assert FakeKGEdgeEvidence.objects.records == {}
 
 
+def test_live_sync_explicit_skip_evidence_never_reads_present_evidence(
+    tmp_path: Path, monkeypatch
+) -> None:
+    root = tmp_path / "kg"
+    _write_edge_fixture(root)
+    _patch_fake_lamin(monkeypatch)
+
+    summaries = live_sync.sync_parquet_edges_to_lamindb(
+        root,
+        relations=["disease_associated_gene"],
+        edge_limit=1,
+        evidence_limit=1,
+        skip_evidence=True,
+        write=True,
+    )
+
+    summary = summaries[0]
+    assert summary.edge_upserts == 1
+    assert summary.evidence_upserts == 0
+    assert summary.evidence_rows_available == 0
+    assert summary.evidence_rows_selected == 0
+    assert FakeKGEdgeEvidence.objects.records == {}
+
+
 def test_live_sync_selected_window_source_live_check(tmp_path: Path, monkeypatch) -> None:
     root = tmp_path / "kg"
     _write_edge_fixture(root)
@@ -428,3 +452,20 @@ def test_live_sync_cli_accepts_resume_window_idempotence_arguments() -> None:
     assert args.idempotence_passes == 2
     assert args.verify_selected_live is True
     assert args.json is True
+
+
+def test_live_sync_cli_accepts_explicit_skip_evidence() -> None:
+    parser = live_sync.build_parser()
+
+    args = parser.parse_args(
+        [
+            "gs://example/kg",
+            "--relation",
+            "cell_line_derived_from_tissue",
+            "--edge-limit",
+            "5",
+            "--skip-evidence",
+        ]
+    )
+
+    assert args.skip_evidence is True

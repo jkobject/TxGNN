@@ -392,8 +392,16 @@ def _chunk_windows(offset: int, limit: int, chunk_size: int) -> list[tuple[int, 
 
 
 def _aligned_chunk_windows(window: RelationWindow) -> list[tuple[int, int, int, int]]:
-    edge_chunks = _chunk_windows(window.edge_offset, window.edge_limit, window.chunk_size) if window.edge_limit or window.edge_limit == 0 else []
-    evidence_chunks = _chunk_windows(window.evidence_offset, window.evidence_limit, window.chunk_size) if window.evidence_limit or window.evidence_limit == 0 else []
+    edge_chunks = (
+        _chunk_windows(window.edge_offset, window.edge_limit, window.chunk_size)
+        if window.edge_limit >= 0
+        else []
+    )
+    evidence_chunks = (
+        _chunk_windows(window.evidence_offset, window.evidence_limit, window.chunk_size)
+        if window.evidence_limit >= 0
+        else []
+    )
     if window.edge_limit == 0 and window.evidence_limit == 0:
         return [(window.edge_offset, 0, window.evidence_offset, 0)]
     max_len = max(len(edge_chunks), len(evidence_chunks), 1)
@@ -424,8 +432,24 @@ def compare_selected_live_to_source(kg_root: str | Path, window: RelationWindow)
     """Compare selected source-window rows to currently live LaminDB rows."""
 
     KGEdge, KGEdgeEvidence = _registry_models()
-    edge_frame, edge_total = build_edge_frame(kg_root, window.relation, limit=window.edge_limit, offset=window.edge_offset)
-    evidence_frame, evidence_total = build_evidence_frame(kg_root, window.relation, limit=window.evidence_limit, offset=window.evidence_offset)
+    edge_frame, edge_total = build_edge_frame(
+        kg_root,
+        window.relation,
+        limit=window.edge_limit,
+        offset=window.edge_offset,
+    )
+    if window.evidence_limit < 0:
+        evidence_frame = pd.DataFrame(
+            columns=["evidence_key", *kg_edge_pilot.EVIDENCE_BASE_COLUMNS, "metadata_json"]
+        )
+        evidence_total = 0
+    else:
+        evidence_frame, evidence_total = build_evidence_frame(
+            kg_root,
+            window.relation,
+            limit=window.evidence_limit,
+            offset=window.evidence_offset,
+        )
     source_edges = {str(row["edge_key"]): row for row in edge_frame.to_dict(orient="records")}
     source_evidence = {str(row["evidence_key"]): row for row in evidence_frame.to_dict(orient="records")}
     live_edges = _fetch_by_keys(
@@ -466,8 +490,24 @@ def _sync_relation_pass(
     if resume_chunk < 0:
         raise ValueError("resume_chunk must be >= 0")
     KGEdge, KGEdgeEvidence = _registry_models() if write else (None, None)
-    edge_frame_all, edge_total = build_edge_frame(kg_root, window.relation, limit=window.edge_limit, offset=window.edge_offset)
-    evidence_frame_all, evidence_total = build_evidence_frame(kg_root, window.relation, limit=window.evidence_limit, offset=window.evidence_offset)
+    edge_frame_all, edge_total = build_edge_frame(
+        kg_root,
+        window.relation,
+        limit=window.edge_limit,
+        offset=window.edge_offset,
+    )
+    if window.evidence_limit < 0:
+        evidence_frame_all = pd.DataFrame(
+            columns=["evidence_key", *kg_edge_pilot.EVIDENCE_BASE_COLUMNS, "metadata_json"]
+        )
+        evidence_total = 0
+    else:
+        evidence_frame_all, evidence_total = build_evidence_frame(
+            kg_root,
+            window.relation,
+            limit=window.evidence_limit,
+            offset=window.evidence_offset,
+        )
     summary = LiveEdgeSyncSummary(
         relation=window.relation,
         edge_offset=window.edge_offset,
@@ -557,6 +597,7 @@ def sync_relation_to_lamindb(
     relation: str,
     edge_limit: int = DEFAULT_EDGE_LIMIT,
     evidence_limit: int = DEFAULT_EVIDENCE_LIMIT,
+    skip_evidence: bool = False,
     edge_offset: int = 0,
     evidence_offset: int = 0,
     chunk_size: int = DEFAULT_CHUNK_SIZE,
@@ -581,7 +622,7 @@ def sync_relation_to_lamindb(
         edge_offset=edge_offset,
         edge_limit=edge_limit,
         evidence_offset=evidence_offset,
-        evidence_limit=evidence_limit,
+        evidence_limit=-1 if skip_evidence else evidence_limit,
         chunk_size=chunk_size,
     )
     summary = _sync_relation_pass(
@@ -619,6 +660,7 @@ def sync_parquet_edges_to_lamindb(
     relations: Sequence[str] = DEFAULT_RELATIONS,
     edge_limit: int = DEFAULT_EDGE_LIMIT,
     evidence_limit: int = DEFAULT_EVIDENCE_LIMIT,
+    skip_evidence: bool = False,
     edge_offset: int = 0,
     evidence_offset: int = 0,
     chunk_size: int = DEFAULT_CHUNK_SIZE,
@@ -640,6 +682,7 @@ def sync_parquet_edges_to_lamindb(
                 relation=relation,
                 edge_limit=edge_limit,
                 evidence_limit=evidence_limit,
+                skip_evidence=skip_evidence,
                 edge_offset=edge_offset,
                 evidence_offset=evidence_offset,
                 chunk_size=chunk_size,
@@ -666,6 +709,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--edge-limit", type=int, default=DEFAULT_EDGE_LIMIT, help="Maximum edge rows per relation; use 0 for all rows from offset")
     parser.add_argument("--evidence-offset", type=int, default=0, help="First evidence source row to select")
     parser.add_argument("--evidence-limit", type=int, default=DEFAULT_EVIDENCE_LIMIT, help="Maximum evidence rows per relation; use 0 for all rows from offset")
+    parser.add_argument(
+        "--skip-evidence",
+        action="store_true",
+        help="Explicitly skip evidence input for an edge-only manifest lane",
+    )
     parser.add_argument("--chunk-size", type=int, default=DEFAULT_CHUNK_SIZE, help="Maximum source rows per transaction chunk")
     parser.add_argument("--resume-chunk", type=int, default=0, help="Skip chunks before this 0-based chunk index")
     parser.add_argument("--max-chunks", type=int, default=None, help="Optional maximum number of chunks to process after resume")
@@ -685,6 +733,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         relations=args.relations or list(DEFAULT_RELATIONS),
         edge_limit=args.edge_limit,
         evidence_limit=args.evidence_limit,
+        skip_evidence=args.skip_evidence,
         edge_offset=args.edge_offset,
         evidence_offset=args.evidence_offset,
         chunk_size=args.chunk_size,
