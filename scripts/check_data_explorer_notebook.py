@@ -20,6 +20,7 @@ REQUIRED = [
     "edges_inferred",
     "evidence_inferred",
     "JOUVENCE_BILLING_PROJECT",
+    "live-gcs-only",
     "read_bounded_parquet",
     "list_parquet_uris",
     "server-side GCS cap",
@@ -33,6 +34,10 @@ FORBIDDEN = [
     "GOOGLE_APPLICATION_CREDENTIALS=",
     "pd.read_parquet(SELECTED_URI)",
     "fs.glob(",
+    "build_public_fixture",
+    "kg-fixture",
+    "fixture_rule_engine",
+    "JOUVENCE_DATA_MODE",
 ]
 
 

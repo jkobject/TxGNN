@@ -14,16 +14,39 @@ This directory is the user-facing notebook entry point. It contains only noteboo
 
 The numeric prefix is the canonical order. New user-facing notebooks must continue the sequence with a two-digit prefix.
 
-## Safe execution
+## Fixture-backed execution (notebooks 01–06)
 
 From the repository root:
 
 ```bash
 uv sync --group dev --group notebooks --group gnn
 uv run python scripts/build_public_notebooks.py
-uv run python scripts/build_data_explorer_notebook.py
 uv run python scripts/check_public_notebooks.py --execute
+```
+
+This executes notebooks 01–06 in fixture mode without reading or writing the
+live KG. Notebook 07 is checked statically by the command above but deliberately
+skipped during fixture execution because it is live-only.
+
+## Live-only execution (notebook 07)
+
+Generating notebook 07 is deterministic and does not access GCS:
+
+```bash
+uv run python scripts/build_data_explorer_notebook.py
+```
+
+Executing it performs real, bounded, read-only requester-pays requests against
+the fixed Jouvence canonical and staging GCS roots. Before running it, obtain
+Google application-default credentials for an identity with read access and
+set your own billing project; never use a maintainer billing project:
+
+```bash
+gcloud auth application-default login
+export JOUVENCE_BILLING_PROJECT='<consumer-billing-project>'
 uv run python scripts/check_data_explorer_notebook.py --execute
 ```
 
-Fixture mode is the default and performs no canonical write or full-KG read. Live reads are opt-in and bounded; follow the access variables documented in the repository [`README.md`](../README.md).
+`JOUVENCE_DATA_MODE` does not control notebook 07. The live checker enforces
+bounded row/file limits, but it still lists real objects and samples real
+Parquet data, so do not treat this command as a fixture or no-cloud smoke.

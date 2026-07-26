@@ -34,7 +34,7 @@ This notebook is a **read-only map and inspector**, not a build pipeline. It ans
 4. What are the schema, row groups, columns, nulls, and example rows of one selected object?
 5. Where are embeddings and inferred links, and how do I inspect them without confusing them with observations?
 
-Start in `fixture` mode, then switch to `live` only when the bounded examples make sense.
+This notebook always reads the **real live Jouvence data plane**. It has no fixture/fake-data mode. Reads and object listings remain bounded and read-only.
 """),
         md("""
 ## 1. The storage map
@@ -57,14 +57,14 @@ Live GCS reads use Application Default Credentials (ADC) and a caller-owned requ
 
 ```bash
 gcloud auth application-default login
-export JOUVENCE_DATA_MODE=live
+# Optional if ADC cannot infer your caller-owned project:
 export JOUVENCE_BILLING_PROJECT='<your-billing-project>'
 uv run jupyter lab
 ```
 
 The identity also needs bucket read permission. ADC alone does not grant authorization. The billing project pays request/egress charges but does not grant access. This notebook never embeds credentials or a maintainer billing project.
 
-For a verified local mount or cache, set `JOUVENCE_CANONICAL_ROOT` and `JOUVENCE_STAGING_ROOT` to local paths. Do not use a broad macOS FUSE scan for heavy work; full inventories and embedding scans belong on the in-region worker.
+The roots are deliberately fixed to the real GCS data plane in this notebook. Do not replace them with fixture or cache paths. Full inventories and embedding scans remain worker jobs; this notebook only performs bounded inspection.
 """),
         code("""
 from __future__ import annotations
@@ -79,6 +79,7 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 from fsspec.core import url_to_fs
+from google.auth import default as google_auth_default
 from IPython.display import display
 
 REPO_ROOT = Path.cwd()
@@ -90,68 +91,37 @@ from manage_db.data_explorer import list_parquet_uris
 from manage_db.public_notebooks import (
     PUBLIC_KG_ROOT,
     _storage_options,
-    build_public_fixture,
     read_bounded_parquet,
 )
 
-MODE = os.environ.get("JOUVENCE_DATA_MODE", "fixture").lower()
-BILLING_PROJECT = os.environ.get("JOUVENCE_BILLING_PROJECT")
 try:
     SAMPLE_ROWS = int(os.environ.get("JOUVENCE_EXPLORER_SAMPLE_ROWS", "8"))
     MAX_LISTED = int(os.environ.get("JOUVENCE_EXPLORER_MAX_FILES", "250"))
 except ValueError as exc:
     raise ValueError("explorer row/file limits must be integers") from exc
-if MODE not in {"fixture", "live"}:
-    raise ValueError("JOUVENCE_DATA_MODE must be fixture or live")
 if not 1 <= SAMPLE_ROWS <= 100:
     raise ValueError("JOUVENCE_EXPLORER_SAMPLE_ROWS must be between 1 and 100")
 if not 1 <= MAX_LISTED <= 2000:
     raise ValueError("JOUVENCE_EXPLORER_MAX_FILES must be between 1 and 2000")
+_, ADC_PROJECT = google_auth_default()
+BILLING_PROJECT = os.environ.get("JOUVENCE_BILLING_PROJECT") or ADC_PROJECT
 """),
         md("""
 ### Configuration cell
 
-This is the only cell most users need to update. In live mode the canonical default is `gs://jouvencekb/kg/v2`; override roots only when using a verified local mount/cache. The external staging root is deliberately separate from canonical storage.
-
-The labels below **trust the configured root**. If you point `JOUVENCE_CANONICAL_ROOT` at staging or an arbitrary directory, the notebook cannot prove promotion history and must not be used to call those files canonical.
+The roots below are the real GCS locations. Normally you change nothing: ADC supplies your identity and usually your project. If ADC cannot infer the requester-pays project, set `JOUVENCE_BILLING_PROJECT` before starting Jupyter.
 """),
         code("""
-CACHE = REPO_ROOT / "artifacts" / "cache" / "data-explorer"
-CACHE.mkdir(parents=True, exist_ok=True)
-
-if MODE == "fixture":
-    canonical_root = build_public_fixture(CACHE / "kg-fixture")
-    # Add tiny inferred and staging examples so every section executes offline.
-    inferred_dir = canonical_root / "edges_inferred"
-    inferred_evidence_dir = canonical_root / "evidence_inferred"
-    staging_root = CACHE / "staging-fixture"
-    inferred_dir.mkdir(parents=True, exist_ok=True)
-    inferred_evidence_dir.mkdir(parents=True, exist_ok=True)
-    staging_root.mkdir(parents=True, exist_ok=True)
-    inferred = pd.DataFrame([{
-        "relation": "gene_may_influence_disease", "x_id": "ENSG00000141510",
-        "x_type": "gene", "y_id": "MONDO:0007254", "y_type": "disease",
-        "source": "fixture_rule_engine", "inference_method": "typed_fixture_rule",
-    }])
-    inferred.to_parquet(inferred_dir / "gene_may_influence_disease.parquet", index=False)
-    inferred.assign(source_record_id="fixture:inference:1", confidence=0.8).to_parquet(
-        inferred_evidence_dir / "gene_may_influence_disease.parquet", index=False
+canonical_root = PUBLIC_KG_ROOT
+staging_root = "gs://jouvencekb/kg/staging"
+if not BILLING_PROJECT:
+    raise RuntimeError(
+        "Could not infer a requester-pays project from ADC. Set "
+        "JOUVENCE_BILLING_PROJECT to your own project, restart the kernel, and rerun."
     )
-    pd.DataFrame([{"node_id": "ENSG_STAGED", "status": "candidate"}]).to_parquet(
-        staging_root / "candidate_feature.parquet", index=False
-    )
-else:
-    canonical_root = os.environ.get("JOUVENCE_CANONICAL_ROOT", PUBLIC_KG_ROOT)
-    staging_root = os.environ.get("JOUVENCE_STAGING_ROOT", "gs://jouvencekb/kg/staging")
-    gcs_roots = [root for root in (canonical_root, staging_root) if str(root).startswith("gs://")]
-    if gcs_roots and not BILLING_PROJECT:
-        raise RuntimeError(
-            "Every configured GCS root requires JOUVENCE_BILLING_PROJECT. "
-            "Use your own billing project; do not put it in this notebook."
-        )
 
 print({
-    "mode": MODE,
+    "mode": "live-gcs-only",
     "canonical_root": str(canonical_root),
     "staging_root": str(staging_root),
     "sample_rows": SAMPLE_ROWS,
@@ -402,17 +372,17 @@ This notebook shows **what exists and how it is encoded**. It does not replace t
 
 1. Add a row to `SURFACES` only when a new storage contract is introduced.
 2. Change `SELECTED_URI` to inspect another object; do not duplicate cells.
-3. Rerun from the top after changing mode or roots.
+3. Rerun from the top after changing access credentials or bounded limits.
 4. Regenerate the committed notebook with:
 
 ```bash
 uv run python scripts/build_data_explorer_notebook.py
 ```
 
-5. Verify the clean source notebook in fixture mode with:
+5. Verify the clean source notebook against live GCS with:
 
 ```bash
-env -u JOUVENCE_DATA_MODE -u JOUVENCE_BILLING_PROJECT \
+JOUVENCE_BILLING_PROJECT='<your-billing-project>' \
   uv run python scripts/check_data_explorer_notebook.py --execute
 ```
 
@@ -431,7 +401,7 @@ For a live exhaustive inventory or full embedding analysis, create a reviewed wo
         "kernelspec": {"display_name": "Python 3", "language": "python", "name": "python3"},
         "language_info": {"name": "python", "version": "3.11"},
         "jouvence": {
-            "default_mode": "fixture",
+            "data_mode": "live-gcs-only",
             "bounded": True,
             "read_only": True,
             "purpose": "data-inventory-explorer",
