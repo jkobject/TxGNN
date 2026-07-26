@@ -44,6 +44,11 @@ For “set this up and show me Jouvence,” follow
 mode unless `JOUVENCE_DATA_MODE=live` is explicit. Live GCS reads require the
 consumer's own `JOUVENCE_BILLING_PROJECT` and ADC; never invent or reuse a
 maintainer billing project. Default to read-only, bounded, named-table access.
+Exception: `notebooks/07_data_inventory_explorer.ipynb` is intentionally
+live-only and does not use `JOUVENCE_DATA_MODE`; its separate checker must be
+treated as a real requester-pays GCS operation and run only after ADC and a
+caller-owned `JOUVENCE_BILLING_PROJECT` are explicit. The fixture-suite checker
+statically validates notebook 07 but skips its execution.
 `JOUVENCE_LAMIN_LIVE=1` is a separate opt-in and does not make the currently
 partial/external-blocked Lamin mirror canonical. All-relation scans, bulk
 downloads, production PyG/GNN, bulk Lamin work, and embedding/full-KG scans are

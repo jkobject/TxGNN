@@ -56,7 +56,9 @@ Database construction, ingestion, schema-audit, and paper-reproduction
 notebooks live separately in [`reproduce/`](reproduce/), also in a numbered
 sequence. They are not part of the user quickstart.
 
-Run the complete fixture-backed suite without reading the live KG:
+Run notebooks 01–06 in fixture mode without reading the live KG. This command
+also checks notebook 07 statically, but reports it as `skipped-live-gcs` instead
+of executing it:
 
 ```bash
 uv sync --group dev --group notebooks --group gnn
@@ -64,14 +66,27 @@ uv run python scripts/build_public_notebooks.py
 uv run python scripts/check_public_notebooks.py --execute
 ```
 
-Fixture mode is the default so the notebooks execute in a clean environment.
-For bounded live public reads, authenticate with Google application-default
-credentials and supply your own requester-pays billing project; this repository
-does not embed or require a project-specific default. The bucket is not
-anonymous: a new collaborator currently needs the maintainer to grant their
-Google identity read-only object access first. See the
+Fixture mode is the default for notebooks 01–06 so they execute in a clean
+environment. Their bounded live mode is explicitly enabled with
+`JOUVENCE_DATA_MODE=live`.
+
+Notebook 07, the data inventory explorer, is a separate live-only entry point:
+it does not use `JOUVENCE_DATA_MODE`. Its execution performs real, bounded,
+read-only requester-pays requests against fixed canonical and staging GCS roots.
+Authenticate with Google application-default credentials and supply your own
+billing project before running it:
+
+```bash
+gcloud auth application-default login
+export JOUVENCE_BILLING_PROJECT='<consumer-billing-project>'
+uv run python scripts/check_data_explorer_notebook.py --execute
+```
+
+The repository does not embed or require a project-specific default billing
+project. The bucket is not anonymous: a new collaborator currently needs the
+maintainer to grant their Google identity read-only object access first. See the
 [`data quickstart`](docs/getting-started-data.md) for the current PASS/BLOCK
-boundary and exact prerequisites:
+boundary and exact prerequisites. For live mode in notebooks 01–06, use:
 
 ```bash
 export JOUVENCE_DATA_MODE=live
