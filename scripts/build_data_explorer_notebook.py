@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import argparse
 import hashlib
 from pathlib import Path
 
@@ -20,7 +21,7 @@ def code(text: str):
     return nbf.v4.new_code_cell(text.strip() + "\n")
 
 
-def main() -> None:
+def build(output: Path = OUTPUT) -> None:
     cells = [
         md("""
 # 07 — Explore the Jouvence data that exist today
@@ -95,16 +96,24 @@ from manage_db.public_notebooks import (
 
 MODE = os.environ.get("JOUVENCE_DATA_MODE", "fixture").lower()
 BILLING_PROJECT = os.environ.get("JOUVENCE_BILLING_PROJECT")
-SAMPLE_ROWS = int(os.environ.get("JOUVENCE_EXPLORER_SAMPLE_ROWS", "8"))
-MAX_LISTED = int(os.environ.get("JOUVENCE_EXPLORER_MAX_FILES", "250"))
-assert MODE in {"fixture", "live"}, "JOUVENCE_DATA_MODE must be fixture or live"
-assert 1 <= SAMPLE_ROWS <= 100, "keep interactive samples between 1 and 100 rows"
-assert 1 <= MAX_LISTED <= 2000, "keep displayed inventories bounded"
+try:
+    SAMPLE_ROWS = int(os.environ.get("JOUVENCE_EXPLORER_SAMPLE_ROWS", "8"))
+    MAX_LISTED = int(os.environ.get("JOUVENCE_EXPLORER_MAX_FILES", "250"))
+except ValueError as exc:
+    raise ValueError("explorer row/file limits must be integers") from exc
+if MODE not in {"fixture", "live"}:
+    raise ValueError("JOUVENCE_DATA_MODE must be fixture or live")
+if not 1 <= SAMPLE_ROWS <= 100:
+    raise ValueError("JOUVENCE_EXPLORER_SAMPLE_ROWS must be between 1 and 100")
+if not 1 <= MAX_LISTED <= 2000:
+    raise ValueError("JOUVENCE_EXPLORER_MAX_FILES must be between 1 and 2000")
 """),
         md("""
 ### Configuration cell
 
 This is the only cell most users need to update. In live mode the canonical default is `gs://jouvencekb/kg/v2`; override roots only when using a verified local mount/cache. The external staging root is deliberately separate from canonical storage.
+
+The labels below **trust the configured root**. If you point `JOUVENCE_CANONICAL_ROOT` at staging or an arbitrary directory, the notebook cannot prove promotion history and must not be used to call those files canonical.
 """),
         code("""
 CACHE = REPO_ROOT / "artifacts" / "cache" / "data-explorer"
@@ -134,9 +143,10 @@ if MODE == "fixture":
 else:
     canonical_root = os.environ.get("JOUVENCE_CANONICAL_ROOT", PUBLIC_KG_ROOT)
     staging_root = os.environ.get("JOUVENCE_STAGING_ROOT", "gs://jouvencekb/kg/staging")
-    if str(canonical_root).startswith("gs://") and not BILLING_PROJECT:
+    gcs_roots = [root for root in (canonical_root, staging_root) if str(root).startswith("gs://")]
+    if gcs_roots and not BILLING_PROJECT:
         raise RuntimeError(
-            "Live GCS mode requires JOUVENCE_BILLING_PROJECT. "
+            "Every configured GCS root requires JOUVENCE_BILLING_PROJECT. "
             "Use your own billing project; do not put it in this notebook."
         )
 
@@ -427,9 +437,16 @@ For a live exhaustive inventory or full embedding analysis, create a reviewed wo
             "purpose": "data-inventory-explorer",
         },
     }
-    OUTPUT.parent.mkdir(parents=True, exist_ok=True)
-    nbf.write(notebook, OUTPUT)
-    print(f"wrote {OUTPUT.relative_to(ROOT)} ({len(cells)} meaningful cells)")
+    output.parent.mkdir(parents=True, exist_ok=True)
+    nbf.write(notebook, output)
+    print(f"wrote {output} ({len(cells)} meaningful cells)")
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--output", type=Path, default=OUTPUT)
+    args = parser.parse_args()
+    build(args.output)
 
 
 if __name__ == "__main__":
