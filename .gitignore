@@ -157,7 +157,7 @@ mjouvencekb/
 # Local agent/runtime state (never reviewable source)
 .omoc/
 /.omx/
-/.claude/worktrees/
+/.claude/
 /.openclaw/
 /.tmp/
 

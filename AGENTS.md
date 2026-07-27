@@ -1,7 +1,7 @@
 
 # AGENTS.md — Jouvence agent boot
 
-This is the single required boot file for Jouvence agents. This file replaces the old dual-entrypoint pattern; do not ask workers to read a second root boot file.
+This is the single required boot file for Jouvence agents. This file replaces the old dual-entrypoint pattern; do not ask workers to read a second root boot file. Claude Code and other agents must use this file directly: do not recreate a root `CLAUDE.md` or commit `.claude/` runtime/worktree state.
 
 ## Project gist
 
