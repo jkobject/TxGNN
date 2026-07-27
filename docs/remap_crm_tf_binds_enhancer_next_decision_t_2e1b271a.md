@@ -1,11 +1,13 @@
 # ReMap CRM `tf_binds_enhancer` next-route decision
 
 Kanban task: `t_2e1b271a`
-Status: `policy decided`; full CRM remains `support-only`; no full edge/evidence build authorized.
+Status: `route C complete`; full CRM remains `support-only`; no full edge/evidence build authorized; no active execution supervision.
 
 ## Decision
 
 Choose route C for the full/unbounded ReMap CRM line: keep the full ReMap CRM artifact as a sharded support/QA sidecar only until a stricter reduction policy exists.
+
+Route C is complete as the current product/control-plane outcome. Existing scientific artifacts and receipts remain preserved, but ReMap now has no active watchdog, resume path, SSH-liveness check, health verdict, recovery reason, or notification route. Any future aggregate reducer or external full materialization is a new explicitly approved project, not continuation of an active ReMap lane.
 
 This does not reverse the ontology direction from the bounded pilot: reviewed ReMap CRM/peak evidence can support the canonical relation label `tf_binds_enhancer` when the edge/evidence semantics are explicitly scoped and validated. It only says the current full/unbounded CRM artifact must not be converted into active `tf_binds_enhancer` graph topology by semantic shortcut.
 
