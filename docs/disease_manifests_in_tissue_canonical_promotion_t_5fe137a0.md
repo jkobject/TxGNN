@@ -2,7 +2,7 @@
 
 Date: 2026-06-24  
 Producer/staged source: `t_badd3e1e`, semantic approval from `t_7e5953c2`.  
-Status: `canonical promoted` / `review-required`.
+Status: `canonical promoted` / `review-accepted` by `t_efac22a4`; exact immutable generations reconfirmed by `t_2d1f767d`.
 
 ## Scope
 
@@ -91,4 +91,4 @@ Observed outputs:
 
 ## Residual risks / review notes
 
-Independent review is still required before this promotion is treated as accepted. This is a narrow cancer-context-specific HPA/TCGA promotion, not a broad all-disease pathology tissue-manifestation graph.
+Independent review accepted this exact narrow cancer-context-specific HPA/TCGA promotion, and `t_2d1f767d` reconfirmed the unchanged object generations and relation gates. It is not a broad all-disease pathology tissue-manifestation graph.

@@ -1,10 +1,10 @@
 # 05 — ReMap
 
-Heavy-job guardrail: ReMap scaling, full/unbounded CRM/peak work, and large support/evidence materialization must run on `txgnn-worker` or another explicitly approved in-region worker with source `gs://jouvencekb/kg/v2`. Do not run heavy ReMap reads/writes from the Mac through `/Users/jkobject/mnt/gcs/...` / macOS GCS-FUSE. Future cards must include `must_run_on=txgnn-worker`, `hostname` and `gcloud compute ssh` preflight, an existing-process check, and a fail-fast guard for paths starting `/Users/jkobject/mnt/gcs`.
+ReMap route C is complete and unsupervised. There is no active ReMap watchdog, resume loop, SSH-liveness gate, or recovery lane. The historical VM-only guardrails and supervisor artifacts remain evidence of how prior runs were bounded; they are not permission to launch or auto-resume ReMap processing.
 
 ## Current state
 
-All-peak/full ReMap is stopped/deferred; it is not `production/full done`.
+Route C is complete as the selected support-only product outcome. The accepted sidecars remain preserved; all-peak/full expansion and conversion to active graph topology remain deferred and are not `production/full done`.
 
 - `t_8bc6dacf` — stopped by user strategy decision; not canonical; do not auto-resume.
 - No canonical `tf_binds_enhancer` edge/evidence exists yet, but the approved ontology direction is to use `tf_binds_enhancer` for ReMap CRM/peak/motif-supported TF-enhancer binding evidence rather than inventing a permanent support-only relation label.
@@ -30,10 +30,10 @@ Accepted support-only artifacts:
 - A new bounded staged candidate is justified: active `tf_binds_enhancer` rows should use ReMap `all` peak evidence where available and may use CRM-derived reconstructed binding support when the evidence row records the reconstruction policy, missing CRM-native peak foreign key, metadata coverage, motif support, context fields, and leakage guard.
 - `tf_regulates_gene` is blocked from the CRM support artifact. It requires a separate source-native TF→target regulation source or an explicitly reviewed inferred-relation policy.
 
-## Active next step
+## Completed route C / future approval boundary
 
 - Keep the existing promoted bounded `features/remap_crm_tf_enhancer_support.parquet` as a `crm_aggregated_support` feature/QA sidecar; it was not overwritten by the full sidecar promotion.
-- Fresh-UDC continuation operations policy (`t_a2674d49`): foreground cards should use `--max-tiles 5`; larger bounded continuations require a supervisor/background pattern with heartbeat/progress JSON, stdout/stderr/rc capture, task-local fresh UDC, and canonical-negative validation/enforcement. Use `artifacts/reports/t_a2674d49/remap_fresh_udc_supervisor.py` / `artifacts/reports/t_a2674d49/remap_supervisor_plan.md` as the reusable local template. Never use the old suspected-corrupt `artifacts/cache/t_1bc29376/udc` cache; relative, absolute, and descendant spellings are supervisor-rejected after path normalization. Full/unbounded caps (`--max-tiles >= 3220`, including `3220`) are rejected unless `--reviewed-full-run-override` is supplied after a separate reviewed operations gate; do not use the override for normal bounded continuations.
+- Historical fresh-UDC continuation policy and templates from `t_a2674d49` are retained for reproducibility only. They are retired from the active control plane and must not be invoked by preflight, supervisor, health, recovery, cron, or automatic dispatch logic.
 - Treat `features/remap_crm_tf_enhancer_support_full/` as shard-aware support-only feature/QA material, not graph topology and not a replacement for `tf_binds_enhancer` edge/evidence promotion.
 - `t_6c07d9c8` — shard-aware read-only helper added at `manage_db/remap_crm_support_reader.py` with fixture tests in `tests/test_remap_crm_support_reader.py`. Use it to list the 24 canonical shards, read bounded TF/enhancer samples from one chromosome, read `tf_global_summary.parquet`, and run bounded endpoint checks over loaded samples. Live FUSE readback report: `artifacts/reports/t_6c07d9c8_remap_crm_support_reader_live_readback.json`. Semantics remain support-only feature/QA material, not edge/evidence/observed binding/inferred topology.
 - `t_a405fe3b` / reviewer `t_95856c15` — bounded first80 chr1 CRM/peak `tf_binds_enhancer` edge/evidence pilot is `pilot accepted` / `staged-only` with 1,224,536 edges and 6,356,561 evidence rows. It is not canonical/full production.
@@ -46,4 +46,4 @@ Accepted support-only artifacts:
 
 ## Definition of done
 
-ReMap CRM binding work is done only when a staged `tf_binds_enhancer` artifact at agreed scope exists, required motif support has either been materialized or explicitly reviewed as unavailable for that scope, its edge/evidence schema is validated/reviewed, endpoint and evidence audits pass, and reviewer approval accepts the evidence classes. CRM/ReMap/motif caveats belong in evidence fields and leakage policy; they should not erase the `tf_binds_enhancer` relation label.
+Route C is done when its reviewed support-only sidecars and policy receipts remain preserved and no ReMap execution path participates in active preflight, health, recovery, or notification logic. A future `tf_binds_enhancer` topology product would be separate, explicitly approved work with its own staged artifact, motif/evidence policy, endpoint audits, leakage controls, and reviewer gate; route C completion does not claim that future topology product.

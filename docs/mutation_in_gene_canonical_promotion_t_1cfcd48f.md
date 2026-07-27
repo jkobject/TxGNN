@@ -2,7 +2,7 @@
 
 Date: 2026-06-24  
 Producer/staged source: `t_2bb8e7de`, accepted by reviewer `t_8b4de179` as a full staged candidate only.  
-Status: `canonical promoted` / `review-required`.
+Status: `canonical promoted` / `review-accepted` by `t_18a346a4`; exact immutable generations reconfirmed by `t_2d1f767d`.
 
 ## Scope
 
@@ -107,7 +107,7 @@ gcloud storage cp artifacts/staged/t_2bb8e7de/mutation-in-gene-full-contained-20
 
 ## Residual risks / review notes
 
-- Independent review is still required before this promotion is treated as fully accepted in project status language.
+- Independent review accepted this exact canonical revision; consolidated reviewer `t_2d1f767d` reconfirmed unchanged generations, hashes, counts, endpoint registries, containment, support, and leakage gates.
 - The canonical evidence object was uploaded by `gcloud storage cp` with parallel composite upload enabled; GCS metadata lacks an MD5 for that object and reports `Component-Count: 5`, but staged and FUSE canonical sha256 values match exactly.
 - The proof sidecar is stored under a new canonical `proof/` prefix because this relation's source policy requires preserving the independent OpenTargets `target.genomicLocation` containment proof for every edge.
-- `mutation_overlaps_enhancer` remains context/support feature-only; no canonical edge write was performed for that relation.
+- This promotion wrote no `mutation_overlaps_enhancer` object. That relation was later promoted separately from the support-gated `t_73c67c1b` candidate by `t_00551bc3`; raw coordinate-overlap-only rows remain context/support-only.

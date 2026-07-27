@@ -31,7 +31,7 @@ Definition: inferred links must remain labeled/separate from observed canonical 
 Counts:
 
 - 67 active declared relations
-- 40 canonical active edge relations, including three `canonical promoted`/`review-required` relations awaiting independent acceptance
+- 40 canonical active edge relations; the three previously review-required writes are review-accepted at unchanged object generations by `t_2d1f767d`
 - 27 declared relations not canonical yet
 - 18 staged-only/deferred
 - 5 schema-only/missing
@@ -47,8 +47,8 @@ Counts:
 - `t_79f8684d` — 25k policy-aware staged tranche: `pilot accepted`/`staged-only` for QA only; not canonical; not full all-part rebuild.
 - `t_f32f1f5b` — all-25-part `mutation_affects_transcript` staged candidate accepted after validation/review.
 - `t_225ae18c` — `mutation_affects_transcript` canonical promotion completed and independently accepted.
-- `t_1cfcd48f` — `mutation_in_gene` relation-specific canonical promotion completed from full all-25-part containment-gated candidate (`t_2bb8e7de`) after live canonical FUSE endpoint revalidation; status `canonical promoted`/`review-required` until independent review accepts the canonical write. Canonical paths: `gs://jouvencekb/kg/v2/edges/mutation_in_gene.parquet`, `gs://jouvencekb/kg/v2/evidence/mutation_in_gene.parquet`, and `gs://jouvencekb/kg/v2/proof/mutation_in_gene_containment_proof.parquet`. Report: `docs/mutation_in_gene_canonical_promotion_t_1cfcd48f.md`.
-- `mutation_overlaps_enhancer` — coordinate-overlap alone remains context/support-only and not canonical observed regulatory evidence. User correction `t_0aa76f3b`: externally support-gated overlap (eQTL, GWAS/L2G, ClinVar/OpenTargets variant disease/gene support, MPRA, allele-specific regulatory evidence, or similar) may become an evidence-backed edge candidate with support source/score/context and leakage policy. `t_00551bc3` relation-specifically promoted the reviewed `t_73c67c1b` non-context-support-gated candidate to canonical `edges/` and `evidence/` with 1,664,278 rows each, 5,814 mutation endpoints, 114,191 enhancer endpoints, zero endpoint misses, zero duplicate/gap failures, canonical/staged SHA256 parity, and targeted edge/evidence audit passing; status `canonical promoted`/`review-required` pending independent acceptance. Report: `docs/mutation_overlaps_enhancer_canonical_promotion_t_00551bc3.md`.
+- `t_1cfcd48f` — `mutation_in_gene` relation-specific canonical promotion completed from full all-25-part containment-gated candidate (`t_2bb8e7de`) after live endpoint revalidation; status `canonical promoted`/`review-accepted` by `t_18a346a4`, reconfirmed at unchanged object generations by `t_2d1f767d`. Canonical paths: `gs://jouvencekb/kg/v2/edges/mutation_in_gene.parquet`, `gs://jouvencekb/kg/v2/evidence/mutation_in_gene.parquet`, and `gs://jouvencekb/kg/v2/proof/mutation_in_gene_containment_proof.parquet`. Report: `docs/mutation_in_gene_canonical_promotion_t_1cfcd48f.md`.
+- `mutation_overlaps_enhancer` — coordinate-overlap alone remains context/support-only and not canonical observed regulatory evidence. User correction `t_0aa76f3b`: externally support-gated overlap may become an evidence-backed edge candidate with support source/score/context and leakage policy. `t_00551bc3` relation-specifically promoted the reviewed `t_73c67c1b` non-context-support-gated candidate to canonical `edges/` and `evidence/` with 1,664,278 rows each, 5,814 mutation endpoints, 114,191 enhancer endpoints, zero endpoint misses, zero duplicate/gap failures, canonical/staged SHA256 parity, and support-gate checks passing; status `canonical promoted`/`review-accepted` by `t_d11a3bb7`, reconfirmed by `t_2d1f767d`. Report: `docs/mutation_overlaps_enhancer_canonical_promotion_t_00551bc3.md`.
 - `t_4b1227b3` — canonical promotion only after relation-specific explicit review acceptance; not a blanket genomic-direct promotion.
 
 ## Other active relation waves

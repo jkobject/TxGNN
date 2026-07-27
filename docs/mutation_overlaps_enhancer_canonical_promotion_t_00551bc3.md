@@ -3,7 +3,7 @@
 Kanban task: `t_00551bc3`  
 Source staged candidate: `t_73c67c1b`  
 Reviewer for staged candidate: `t_2fb6ffeb`  
-Status: `canonical promoted` / `review-required`
+Status: `canonical promoted` / `review-accepted` by `t_d11a3bb7`; exact immutable generations reconfirmed by `t_2d1f767d`
 
 ## Bottom line
 
@@ -83,7 +83,7 @@ Non-context support classes in the reviewed source:
 
 - The relation remains associative/indirect (`direct=False` in schema): most available support is disease/gene/phenotype association context rather than direct enhancer-activity perturbation.
 - Stronger eQTL, caQTL, MPRA, or allele-specific regulatory evidence was not available in the current KG support inputs and should remain preferred for future refinement.
-- The canonical write is intentionally `review-required`; downstream training/export should respect the leakage warning in the evidence metadata.
+- The canonical write is review-accepted for this support-gated candidate only; downstream training/export must still respect the leakage warning in the evidence metadata.
 
 ## Rollback notes
 
