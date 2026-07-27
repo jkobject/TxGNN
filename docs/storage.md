@@ -1,15 +1,17 @@
 # Jouvence KG storage
 
-Stable data, LaminDB state, and temporary candidates share `gs://jouvencekb`
-under disjoint prefixes. Only `raw/` and `main/` are stable public data. A
-prefix-scoped lifecycle applies exclusively to `staging/`, never to canonical
-data or LaminDB state.
+Stable data, durable derived PyG artifacts, LaminDB state, and temporary
+candidates share `gs://jouvencekb` under disjoint prefixes. Only `raw/` and
+`main/` are canonical public data. `pyg/` is a durable, reproducible derived
+training layer. A prefix-scoped lifecycle applies exclusively to `staging/`,
+never to canonical data, PyG snapshots, or LaminDB state.
 
 ## Namespaces
 
 | Purpose | URI | Contract |
 |---|---|---|
 | Stable public data | `gs://jouvencekb/{raw,main}` | Durable, reviewed data |
+| Derived PyG snapshots | `gs://jouvencekb/pyg/<graph-build-id>` | Durable, immutable, reproducible from an exact `main/` snapshot; not canonical biology |
 | Temporary candidates | `gs://jouvencekb/staging` | Non-canonical; prefix-scoped lifecycle deletion after 14 days |
 | LaminDB internals | `gs://jouvencekb/.lamin` | Hidden runtime/catalog state; not a public data layer |
 
@@ -23,14 +25,24 @@ gs://jouvencekb/
 │   └── lamin/...
 ├── raw/
 │   └── <source>.<native-format>
-└── main/
-    ├── nodes/<node-type>.parquet
-    ├── edges/<relation>.parquet
-    ├── edges_inferred/<relation>.parquet
-    ├── evidence/<relation>.parquet
-    ├── evidence_inferred/<relation>.parquet
-    ├── features/<feature>.parquet
-    └── embeddings/<entity>-<modality>-<model>.parquet
+├── main/
+│   ├── nodes/<node-type>.parquet
+│   ├── edges/<relation>.parquet
+│   ├── edges_inferred/<relation>.parquet
+│   ├── evidence/<relation>.parquet
+│   ├── evidence_inferred/<relation>.parquet
+│   ├── features/<feature>.parquet
+│   └── embeddings/<entity>-<modality>-<model>.parquet
+└── pyg/
+    └── <graph-build-id>/
+        ├── manifest.json
+        ├── node_maps/
+        ├── adjacency/
+        ├── feature_indices/
+        │   ├── nodes/
+        │   ├── edges/
+        │   └── splits/
+        └── validation/
 
 gs://jouvencekb/
 └── staging/
@@ -55,6 +67,10 @@ Parquets.
 - `main/features/`: non-topological node/edge feature sidecars.
 - `main/embeddings/`: accepted learned vector tables, one flat Parquet object per
   entity/modality/model release.
+- `pyg/`: immutable derived training snapshots: node index maps, disk-backed CSC
+  adjacency, aligned feature arrays/masks, split metadata, and validation
+  reports. It is reproducible from exact `main/` generations and never replaces
+  canonical Parquet.
 
 The old `metadata/` layer was not a coherent data layer. Clinical-trial indexes,
 trial links, and mutation support rows are feature sidecars. Promotion receipts,
@@ -71,6 +87,7 @@ Use:
 - canonical read root: `gs://jouvencekb/main`
 - raw source root: `gs://jouvencekb/raw`
 - candidate write root: `gs://jouvencekb/staging/<task-or-build-id>`
+- durable derived PyG root: `gs://jouvencekb/pyg/<graph-build-id>`
 - LaminDB storage root: `gs://jouvencekb/.lamin`
 
 For FUSE, mount the bucket root and point code at `<mount>/main`; do not recreate
@@ -88,6 +105,11 @@ a local `kg/v2` alias.
 5. Refresh and check `docs/parquet-catalog/` against the live bucket.
 6. Delete or allow lifecycle deletion of the staging candidate only after the
    canonical readback passes.
+
+For PyG snapshots, build under `staging/<build-id>/pyg`, validate exact source
+generations, adjacency, feature alignment and split leakage, then publish
+marker-last to a new immutable `pyg/<graph-build-id>/`. PyG publication does not
+mutate `main/` and does not make the artifact canonical biological data.
 
 Never create `staged/`, `staging/`, `metadata/`, `proof/`, or `archive/` in the
 stable bucket or inside `main/`. Candidate bundles, checkpoints, and transient

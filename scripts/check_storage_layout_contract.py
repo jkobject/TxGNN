@@ -35,7 +35,9 @@ FORBIDDEN = (
     "/jouvencekb-kg/v2",
 )
 ALLOWED_TOP_LEVEL_OBJECTS = {"README.md"}
-ALLOWED_TOP_LEVEL_PREFIXES = {".lamin/", "raw/", "main/", "staging/"}
+REQUIRED_TOP_LEVEL_PREFIXES = {".lamin/", "raw/", "main/"}
+OPTIONAL_TOP_LEVEL_PREFIXES = {"pyg/", "staging/"}
+ALLOWED_TOP_LEVEL_PREFIXES = REQUIRED_TOP_LEVEL_PREFIXES | OPTIONAL_TOP_LEVEL_PREFIXES
 
 
 def active_files() -> list[Path]:
@@ -73,7 +75,9 @@ def check_live() -> list[str]:
     unexpected_objects = sorted(root_objects - ALLOWED_TOP_LEVEL_OBJECTS)
     unexpected_prefixes = sorted(prefixes - ALLOWED_TOP_LEVEL_PREFIXES)
     missing_objects = sorted(ALLOWED_TOP_LEVEL_OBJECTS - root_objects)
-    missing_prefixes = sorted(ALLOWED_TOP_LEVEL_PREFIXES - prefixes)
+    # GCS has no real empty directories. Derived `pyg/` and temporary `staging/`
+    # therefore appear only while they contain live objects.
+    missing_prefixes = sorted(REQUIRED_TOP_LEVEL_PREFIXES - prefixes)
     if unexpected_objects:
         errors.append(f"unexpected root objects: {unexpected_objects}")
     if unexpected_prefixes:

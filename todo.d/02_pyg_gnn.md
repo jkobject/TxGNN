@@ -8,6 +8,25 @@ Heavy-job guardrail: production/full PyG exports and training must run on `txgnn
 
 **PyG is training-ready in architecture, but full-KG model training is not done.**
 
+### 2026-07-27 neighbor-loading correction
+
+Sequential Parquet edge minibatching is retained for exhaustive audits, derived
+artifact builds, and simple edge scorers. It is **not** the final multi-hop GNN
+training loader. The accepted production direction is:
+
+- immutable derived snapshots under `gs://jouvencekb/pyg/<graph-build-id>/`;
+- destination-sorted CSC adjacency plus technical reverse relations;
+- worker-local SSD cache and memory-mapped `GraphStore`/`FeatureStore`;
+- `NeighborLoader` for node-seed tasks and `LinkNeighborLoader` for Jouvence link
+  prediction;
+- split-aware adjacency that excludes validation/test labels and their reverse
+  edges;
+- small public helpers for resolve/cache/open/loader construction/batch
+  inspection, demonstrated in notebook 07.
+
+Detailed contract: `docs/guides/pyg-and-embedding-contracts.md`. Human feature
+policy: `docs/guides/pyg-feature-registry.md`.
+
 Validated runtime evidence:
 
 - real `torch_geometric.data.HeteroData` artifact exists;
@@ -51,10 +70,18 @@ So the correct answer is: **yes for the sidecar/memmap sampled architecture and 
 
 ## Remaining work
 
-1. Run a larger bucket-local sidecar export on `txgnn-worker` with full node maps and selected full relations.
-2. Train/evaluate using bounded neighbor/relation sampling and record peak RSS under the real 16 GB limit.
-3. Run production model-quality and biological validation; current smoke accuracy is not such evidence.
-4. Keep `paper` and `dataset` outside default message-passing topology.
+1. Build and independently review one versioned CSC neighbor-index snapshot on an
+   approved in-region worker; publish marker-last under `pyg/<graph-build-id>/`.
+2. Implement and test `JouvenceGraphStore`, `JouvenceFeatureStore`, local cache
+   verification, and ergonomic `NeighborLoader`/`LinkNeighborLoader` helpers.
+3. Add exact train/validation/test and reverse-edge anti-leakage validation.
+4. Demonstrate a real heterogeneous two-hop sampled batch in notebook 07 without
+   downloading or rebuilding the full artifact on the Mac.
+5. Train/evaluate using bounded neighbor sampling and record peak RSS under the
+   real 16 GB limit.
+6. Run production model-quality and biological validation; current smoke accuracy
+   is not such evidence.
+7. Keep `paper` and `dataset` outside default message-passing topology.
 
 ## Definition of done
 

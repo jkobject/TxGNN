@@ -13,6 +13,9 @@ Do **not** use `.omoc` for new work. It is a legacy scratch/cache location from 
 - `docs/` for human-readable reports;
 - `gs://jouvencekb/staging/...` for remote staged artifacts;
 - canonical writes only under `gs://jouvencekb/main/...` after validation + review.
+- immutable derived neighbor-sampling artifacts under
+  `gs://jouvencekb/pyg/<graph-build-id>/` only after staged build, review and
+  marker-last publication.
 
 Heavy Jouvence jobs are VM-only. Any card that may run LaminDB full/bulk syncs, production/full PyG/GNN exports or training, embeddings/full-KG scans, all-relation reads, or bulk canonical KG reads/writes must state `must_run_on=txgnn-worker` (the retained VM name) or another explicitly approved in-region worker, use `gs://jouvencekb/main` as source, and forbid `/Users/jkobject/mnt/gcs/...` / macOS GCS-FUSE for heavy work. Required preflight: verify `hostname`, launch/inspect with `gcloud compute ssh txgnn-worker`, check for an existing related writer/process, and fail if any heavy input/output path starts with `/Users/jkobject/mnt/gcs`. Copyable card template: `artifacts/reports/t_d682b7ad/heavy_job_vm_only_card_template.md`. ReMap route C is complete and unsupervised; these generic VM rules do not authorize or resume ReMap work.
 
@@ -44,9 +47,9 @@ This snapshot supersedes the older June/July execution notes below. Detailed den
 1. **The human Gene identity migration is staged-only and review-required.** `t_8b9cdabc` produced a validated staged candidate targeting 81,715 human ENSG nodes at commit `8714378`; its PR and independent review remain outstanding. The 27,610 NCBI IDs are aliases/endpoints that require authoritative remap or explicit quarantine; 158,505 non-human homologue nodes and `gene_ortholog_gene` are excluded from the human canonical candidate. No canonical promotion is claimed.
 2. **LaminDB ingestion is partial, and accepted counters differ from physical counters.** The latest durable accepted ledger (2026-07-18 evidence) is 11,671,485 / 230,874,162 rows. The latest sealed physical readback from the same date is 12,011,512 rows, with +170,027 edges and +170,000 evidence still uncredited. No newer mismatch-0 readback is claimed; the denominator also awaits reviewed ENSG-only rebasing.
 3. **The corrected immutable public embeddings v2 candidate is validated.** Producer `t_2d54477b` published 808,269 rows across 12 logical leaves; independent reviewer `t_2e6b355f` passed the exact 51-object candidate at generation `1784460889447648`. This is a validated immutable candidate, not a mutable latest-pointer or blanket source-backed vector for every node. Rejected v1 remains historical and unaccepted.
-4. **Gene Nucleotide Transformer is stopped-by-user.** `t_d3b876b3` stopped at 6,912 / 78,164 scratch rows. Those rows are non-canonical; do not auto-resume, publish, or count them as accepted coverage.
+4. **The old Gene Nucleotide Transformer scratch run is superseded.** `t_d3b876b3` remains historical/non-canonical, but the later exact-ENSG lineage produced and independently accepted 78,644 / 81,715 genomic embeddings with 3,071 explicit missing. Do not resume the old scratch or superseded continuation `t_41b61edd`.
 5. **DepMap revision 2 is code/test ready but not fully rebuilt.** PR #11 is pushed at `e40e2508b8f061f70fc7a4fcbf05b0f4a1accfaf`; `t_3c7766fa` waits behind the ENSG heavy-worker lane before the required dual full build and fresh immutable staged artifact. The prior candidate remains rejected.
-6. **PyG/GNN has a real reviewed runtime smoke, not full-KG training.** The sidecar/mmap architecture remains the bounded path; full multi-relation model-quality training has not run.
+6. **PyG/GNN has a real reviewed runtime smoke, not full-KG training.** Sequential edge streaming is retained for audit/build work, but the accepted training target is `LinkNeighborLoader`/`NeighborLoader` over a versioned disk-backed CSC `GraphStore` + `FeatureStore` snapshot under `gs://jouvencekb/pyg/`. Full multi-relation model-quality training has not run.
 
 ## Current phase mirrors
 
@@ -96,7 +99,11 @@ Production/full done requires reviewed ENSG-only denominators, exact-ID row pari
 
 ### 2. PyG / GNN
 
-Existing PyG work is a bounded export pilot, not completion.
+Existing PyG work is a bounded export/streaming pilot, not completion. The
+2026-07-27 target is a versioned neighbor-index snapshot, worker-local verified
+cache, memory-mapped `GraphStore`/`FeatureStore`, and split-safe
+`LinkNeighborLoader` training. See `todo.d/02_pyg_gnn.md` and
+`docs/guides/pyg-and-embedding-contracts.md`.
 
 - `t_015bd9a4` — full KG / representative KG PyG export plus runnable GNN smoke/training.
 - `t_1d1eb3a1` — validate actual HeteroData/GNN runtime.
@@ -111,8 +118,11 @@ Four source-backed embedding families now have one independently validated immut
 - `t_2d54477b` — published immutable v2 candidate: 808,269 rows, 12 logical leaves, 51 objects; producer card is historical/triage after handoff.
 - `t_2e6b355f` — independent v2 reviewer: `validated` PASS on 2026-07-19. No latest-pointer mutation or universal-coverage claim.
 - Rejected v1 remains historical and unaccepted.
-- `t_d3b876b3` — gene NT: `stopped-by-user` at 6,912 / 78,164 scratch rows; non-canonical and no auto-resume.
+- `t_d3b876b3` — historical stopped scratch only; superseded by the accepted exact-ENSG lineage with 78,644 / 81,715 embeddings and 3,071 explicit missing. Do not auto-resume it or `t_41b61edd`.
 - Learned fallback is still required where reviewed source vectors are absent; it is not biological evidence.
+- Before more embedding compute, distinguish no-source-payload nodes from
+  source-eligible rows whose embedding computation is genuinely missing. See the
+  human registry `docs/guides/pyg-feature-registry.md`.
 
 ### 4. ReMap
 
