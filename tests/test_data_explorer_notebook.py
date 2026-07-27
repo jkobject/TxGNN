@@ -80,7 +80,7 @@ def test_live_only_roots_all_use_requester_pays_project() -> None:
     text = "\n".join(str(cell.source) for cell in notebook.cells)
 
     assert "canonical_root = PUBLIC_KG_ROOT" in text
-    assert 'staging_root = "gs://jouvencekb/kg/staging"' in text
+    assert 'staging_root = "gs://jouvencekb-staging"' in text
     assert "JOUVENCE_CANONICAL_ROOT" not in text
     assert "JOUVENCE_STAGING_ROOT" not in text
     assert "billing_project=BILLING_PROJECT" in text
@@ -126,22 +126,22 @@ def test_gcs_listing_uses_server_side_cap_and_propagates_errors(
 
         def list_blobs(self, _bucket, **kwargs):
             calls["list"] = kwargs
-            return [Blob("kg/v2/edges/a.parquet"), Blob("kg/v2/edges/b.parquet"), Blob("kg/v2/edges/c.parquet")]
+            return [Blob("main/edges/a.parquet"), Blob("main/edges/b.parquet"), Blob("main/edges/c.parquet")]
 
     monkeypatch.setattr(data_explorer, "Client", FakeClient)
     listing = data_explorer.list_parquet_uris(
-        "gs://jouvencekb/kg/v2/edges", limit=2, billing_project="caller-project"
+        "gs://jouvencekb/main/edges", limit=2, billing_project="caller-project"
     )
 
     assert listing.uris == (
-        "gs://jouvencekb/kg/v2/edges/a.parquet",
-        "gs://jouvencekb/kg/v2/edges/b.parquet",
+        "gs://jouvencekb/main/edges/a.parquet",
+        "gs://jouvencekb/main/edges/b.parquet",
     )
     assert listing.truncated is True
     assert calls["bucket"] == ("jouvencekb", "caller-project")
     assert calls["list"] == {
-        "prefix": "kg/v2/edges/",
-        "match_glob": "kg/v2/edges/**/*.parquet",
+        "prefix": "main/edges/",
+        "match_glob": "main/edges/**/*.parquet",
         "max_results": 3,
         "page_size": 3,
     }
@@ -153,5 +153,5 @@ def test_gcs_listing_uses_server_side_cap_and_propagates_errors(
     monkeypatch.setattr(data_explorer, "Client", FailingClient)
     with pytest.raises(PermissionError, match="denied"):
         data_explorer.list_parquet_uris(
-            "gs://jouvencekb/kg/v2/edges", limit=2, billing_project="caller-project"
+            "gs://jouvencekb/main/edges", limit=2, billing_project="caller-project"
         )

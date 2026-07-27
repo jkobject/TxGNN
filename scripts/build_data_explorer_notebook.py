@@ -43,10 +43,10 @@ Jouvence uses **location as part of the data contract**:
 
 | Surface | Typical root | Meaning |
 |---|---|---|
-| Canonical observations | `.../kg/v2/nodes`, `edges`, `evidence`, `features` | Reviewed, promoted objects in the canonical data plane |
-| Canonical inferred outputs | `.../kg/v2/edges_inferred`, `evidence_inferred` | Reviewed derived links, kept separate from observations |
-| Non-canonical candidates | `.../kg/staging` and internal `v2/staged`, `v2/staging`, `_promotion_staging` | Candidate, partial, deferred, or pre-promotion artifacts; inspect manifests before interpreting |
-| Archives/backups | `v2/archive`, `_backups`, `_removed_relations_*` | Historical or rollback material, not current data |
+| Canonical observations | `gs://jouvencekb/main/{nodes,edges,evidence,features,embeddings}` | Reviewed, promoted objects in the canonical data plane |
+| Canonical inferred outputs | `gs://jouvencekb/main/{edges_inferred,evidence_inferred}` | Reviewed derived links, kept separate from observations |
+| Non-canonical candidates | `gs://jouvencekb-staging` | Temporary candidate, partial, deferred, or pre-promotion artifacts |
+| LaminDB internals | `gs://jouvencekb-lamin` | Runtime/catalog state; never a public Parquet surface |
 
 **Canonical does not mean biologically true.** It means the object passed the project's promotion/review contract. An inferred edge is still an inference even when stored canonically.
 """),
@@ -113,7 +113,7 @@ The roots below are the real GCS locations. Normally you change nothing: ADC sup
 """),
         code("""
 canonical_root = PUBLIC_KG_ROOT
-staging_root = "gs://jouvencekb/kg/staging"
+staging_root = "gs://jouvencekb-staging"
 if not BILLING_PROJECT:
     raise RuntimeError(
         "Could not infer a requester-pays project from ADC. Set "
@@ -141,12 +141,10 @@ SURFACES = pd.DataFrame([
     {"surface": "canonical nodes", "uri": join_uri(canonical_root, "nodes"), "status": "canonical-observed"},
     {"surface": "canonical edges", "uri": join_uri(canonical_root, "edges"), "status": "canonical-observed"},
     {"surface": "canonical evidence", "uri": join_uri(canonical_root, "evidence"), "status": "canonical-observed"},
-    {"surface": "canonical features/embeddings", "uri": join_uri(canonical_root, "features"), "status": "canonical-feature"},
+    {"surface": "canonical features", "uri": join_uri(canonical_root, "features"), "status": "canonical-feature"},
+    {"surface": "canonical embeddings", "uri": join_uri(canonical_root, "embeddings"), "status": "canonical-feature"},
     {"surface": "canonical inferred edges", "uri": join_uri(canonical_root, "edges_inferred"), "status": "canonical-inferred"},
     {"surface": "canonical inferred evidence", "uri": join_uri(canonical_root, "evidence_inferred"), "status": "canonical-inferred"},
-    {"surface": "internal staged", "uri": join_uri(canonical_root, "staged"), "status": "non-canonical"},
-    {"surface": "internal staging", "uri": join_uri(canonical_root, "staging"), "status": "non-canonical"},
-    {"surface": "promotion staging", "uri": join_uri(canonical_root, "_promotion_staging"), "status": "non-canonical"},
     {"surface": "external staging", "uri": str(staging_root), "status": "non-canonical"},
 ])
 display(SURFACES)
@@ -154,7 +152,7 @@ display(SURFACES)
         md("""
 ## 4. List Parquet objects without reading their row payloads
 
-Object listing is cheaper than scanning rows, but it is still a real request. Each surface uses a **server-side GCS cap of `MAX_LISTED + 1`** (or an early-stopping local walk), so the notebook never materializes an exhaustive cloud listing merely to truncate it afterward. Access/network errors propagate visibly; they are not converted into an empty inventory. The ten configured surfaces require at most one bounded listing request each.
+Object listing is cheaper than scanning rows, but it is still a real request. Each surface uses a **server-side GCS cap of `MAX_LISTED + 1`** (or an early-stopping local walk), so the notebook never materializes an exhaustive cloud listing merely to truncate it afterward. Access/network errors propagate visibly; they are not converted into an empty inventory. Each configured surface requires at most one bounded listing request.
 """),
         code("""
 def list_parquets(uri: str, status: str, surface: str, max_files: int = MAX_LISTED) -> pd.DataFrame:
@@ -207,7 +205,7 @@ SELECTED_URI = (
     else inventory.iloc[0]["uri"]
 )
 # To inspect another object, replace the line above, for example:
-# SELECTED_URI = "gs://jouvencekb/kg/v2/edges/disease_associated_gene.parquet"
+# SELECTED_URI = "gs://jouvencekb/main/edges/disease_associated_gene.parquet"
 print("Selected:", SELECTED_URI)
 """),
         code("""
@@ -298,7 +296,7 @@ else:
         md("""
 ## 8. Find embeddings and inspect vector format
 
-Embeddings may be one Parquet or a sharded directory. Their canonical status comes from storage location. A candidate under staging is not canonical merely because its manifest says `accepted`; promotion and readback are separate gates.
+Canonical embeddings are one flat Parquet object per entity/modality/model under `main/embeddings`. A candidate under staging is not canonical merely because its manifest says `accepted`; promotion and readback are separate gates.
 """),
         code("""
 embedding_mask = inventory["uri"].str.contains("embedding", case=False, na=False)

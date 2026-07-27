@@ -57,12 +57,12 @@ heavy work and remain prohibited on laptops.
 ## Safety rules
 
 - Do not treat old `.omoc` paths as current operating instructions; `.omoc/` is legacy-only.
-- Use `artifacts/staged/<task-id>/`, `artifacts/cache/<task-id>/`, `docs/`, or `gs://jouvencekb/kg/staging/...` for new outputs.
-- Canonical KG root: `gs://jouvencekb/kg/v2`; verified FUSE root: `/Users/jkobject/mnt/gcs/jouvencekb-kg/v2`.
-- Heavy Jouvence jobs (LaminDB full/bulk syncs, production/full PyG/GNN exports or training, ReMap scaling, embedding/full-KG scans, and any all-relation or bulk canonical KG read/write) must run on `txgnn-worker` or another explicitly approved in-region worker using `gs://jouvencekb/kg/v2`; do **not** run them from the Mac through `/Users/jkobject/mnt/gcs/...` / macOS GCS-FUSE.
+- Use `artifacts/staged/<task-id>/`, `artifacts/cache/<task-id>/`, `docs/`, or `gs://jouvencekb-staging/<task-id>/` for new outputs.
+- Stable bucket contract: `gs://jouvencekb` contains only `README.md`, `raw/`, and `main/`; canonical KG root is `gs://jouvencekb/main`; Lamin internals live in `gs://jouvencekb-lamin`.
+- Heavy Jouvence jobs (LaminDB full/bulk syncs, production/full PyG/GNN exports or training, ReMap scaling, embedding/full-KG scans, and any all-relation or bulk canonical KG read/write) must run on `txgnn-worker` or another explicitly approved in-region worker using `gs://jouvencekb/main`; do **not** run them from the Mac through `/Users/jkobject/mnt/gcs/...` / macOS GCS-FUSE.
 - Heavy cards must include `must_run_on=txgnn-worker` (or the approved worker), preflight `hostname`, use `gcloud compute ssh` for worker launch/inspection, check for an existing related writer/process before starting, and fail immediately if any heavy input/output path starts with `/Users/jkobject/mnt/gcs`.
 - Project boundary is strict: Jouvence agents and cost guards may manage only Jouvence resources. Never pause, stop, resize, reinterpret, or gate `pert-gym` VMs, crons, disks, processes, or cards; concurrent project activity may be intentional.
-- Canonical writes require explicit card authorization, validation evidence, and reviewer acceptance.
+- Canonical writes require explicit card authorization, validation evidence, reviewer acceptance, and a destination-generation precondition. Never create `staged`, `staging`, `metadata`, `proof`, archives, viewer bundles, or runtime state under `gs://jouvencekb`.
 - Python is managed with `uv`; use `uv run ...`.
 - Intended LaminDB instance: `jkobject/jouvencekb`. Before every write-capable run, prove the connected instance explicitly; a VM config pointing to `jkobject/repo` is a hard blocker, not a harmless alias.
 - LaminDB sync is single-writer. A live PID is not proof of progress: require a durable subchunk delta (`current_offset`, attempted/upserted/verified rows, throughput, and `last_progress_at`). Never advance an offset without selected-live edge/evidence equality and mismatch `0`.
