@@ -28,7 +28,8 @@ REQUIRED = [
     "embedding_projection",
     "stable join",
     "schema_relations_absent_from_kg",
-    "build_pyg_export",
+    "iter_relation_minibatches",
+    "iter_kg_minibatches",
 ]
 FORBIDDEN = [
     "/Users/jkobject/mnt/gcs",
@@ -40,6 +41,9 @@ FORBIDDEN = [
     "kg-fixture",
     "fixture_rule_engine",
     "JOUVENCE_DATA_MODE",
+    "build_pyg_export",
+    "full_graph.pt",
+    "pickle.load",
 ]
 
 

@@ -34,7 +34,7 @@ This notebook is a **bounded, read-only GCS explorer and data-model tutorial**. 
 4. follow a `node → edge → node` path and an `edge → evidence` path;
 5. project a bounded embedding sample with UMAP (or a deterministic PCA fallback);
 6. distinguish staging objects from schema-declared nodes/relations that are not yet materialized in the KG;
-7. build and load a bounded PyTorch Geometric `HeteroData` export.
+7. stream the complete KG into bounded PyTorch Geometric minibatches without a global export.
 
 The canonical roots are `gs://jouvencekb/main/{nodes,edges,evidence,features,embeddings,...}`. Temporary candidates belong only under `gs://jouvencekb/staging/`. LaminDB runtime state under `.lamin/` is intentionally excluded.
 """),
@@ -56,9 +56,7 @@ from __future__ import annotations
 
 import json
 import os
-import pickle
 import sys
-import tempfile
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -419,56 +417,135 @@ display(schema_relations_absent_from_kg)
 display(schema_nodes_absent_from_kg)
 """),
         md("""
-## 8. Build and load a bounded PyG graph
+## 8. Stream the complete KG into PyG minibatches — no global export
 
-The repository exporter validates endpoint maps, creates integer node maps and `edge_index`, and can emit a `torch_geometric.data.HeteroData` pickle. Despite its `.pt` suffix, the current exporter serializes this artifact with Python `pickle`, so load it with `pickle.load`, not `torch.load`. It is disabled by default because this notebook's normal contract is read-only GCS plus local inspection. Set `JOUVENCE_EXPLORER_BUILD_PYG=1` only in a writable local session.
+A whole-graph `HeteroData`/`.pt` is too large and duplicates canonical storage. The loader below reads directly from `main/`:
 
-For production/full exports, use sidecar mode on `txgnn-worker`; do not materialize the full KG as one laptop pickle.
+1. stream one edge Parquet in record batches;
+2. compact only the endpoint IDs present in that batch;
+3. fetch their node rows and available embeddings;
+4. attach numeric edge features such as `credibility` and `score`;
+5. yield a small independent `HeteroData`.
+
+Calling the iterator to exhaustion traverses **all rows of all selected relations** while keeping only one minibatch resident. Canonical IDs remain in `node_id`/`edge_id`; tensor indices are local to the batch.
+
+This is **edge minibatching**, not multi-hop neighbor sampling. True random neighbor sampling over the full graph needs a reviewed on-disk adjacency/`GraphStore` index. Re-scanning every Parquet to discover neighbors for every seed batch would be slower and more expensive than such an index.
 """),
         code("""
-RUN_PYG_DEMO = os.environ.get("JOUVENCE_EXPLORER_BUILD_PYG") == "1"
-if RUN_PYG_DEMO:
-    from torch_geometric.data import HeteroData
-    from manage_db.build_pyg_export import BuildConfig, build_pyg_export
+from torch_geometric.data import HeteroData
+from manage_db.pyg_minibatch import EmbeddingSpec, iter_kg_minibatches, iter_relation_minibatches
 
-    pyg_output = Path(tempfile.mkdtemp(prefix="jouvence-pyg-demo-"))
-    config = BuildConfig(
-        kg_root=str(canonical_root),
-        output_root=str(pyg_output),
-        node_types=("organism", "tissue"),
-        relations=("organism_has_tissue",),
-        max_nodes_per_type=50_000,
-        max_edges_per_relation=50_000,
-        include_reverse_edges=True,
-        artifact_mode="heterodata",
-        build_name="notebook-07-bounded-demo",
+# Choose one accepted embedding table per node type. Types without an accepted
+# embedding remain usable through node IDs/metadata and simply have no `.x`.
+embedding_uri_by_node_type = {}
+for node_type in sorted(NODE_TYPES, key=lambda item: item.value):
+    candidates = inventory.loc[
+        inventory["layer"].eq("embeddings")
+        & inventory["name"].str.startswith(f"{node_type.value}_"),
+        ["name", "uri"],
+    ]
+    if not candidates.empty:
+        # Prefer text embeddings for general exploration; edit this policy for a model.
+        ranked = candidates.assign(
+            preference=candidates["name"].map(lambda name: 0 if "_text_" in name else 1)
+        ).sort_values(["preference", "name"])
+        embedding_uri_by_node_type[node_type.value] = ranked.iloc[0]["uri"]
+
+embedding_specs = {
+    node_type: EmbeddingSpec(uri)
+    for node_type, uri in embedding_uri_by_node_type.items()
+}
+display(pd.Series(embedding_uri_by_node_type, name="selected_embedding_uri"))
+"""),
+        code("""
+MINIBATCH_RELATION = "disease_associated_gene"
+MINIBATCH_SIZE = 256
+
+relation_batches = iter_relation_minibatches(
+    str(canonical_root),
+    MINIBATCH_RELATION,
+    batch_size=MINIBATCH_SIZE,
+    embeddings=embedding_specs,
+    edge_feature_columns=("credibility", "score"),
+    billing_project=BILLING_PROJECT,
+    strict_embeddings=False,
+)
+pyg_batch: HeteroData = next(relation_batches)
+print(pyg_batch)
+print("node types:", pyg_batch.node_types)
+print("edge types:", pyg_batch.edge_types)
+for edge_type in pyg_batch.edge_types:
+    store = pyg_batch[edge_type]
+    print(
+        edge_type,
+        "edges=", store.num_edges,
+        "evidence rows=", len(store.evidence_records) if hasattr(store, "evidence_records") else 0,
     )
-    pyg_result = build_pyg_export(config)
-    pyg_path = pyg_output / "heterodata" / "full_graph.pt"
-    with pyg_path.open("rb") as handle:
-        pyg_graph: HeteroData = pickle.load(handle)
-    print(pyg_result)
-    print(pyg_graph)
-    print("node types:", pyg_graph.node_types)
-    print("edge types:", pyg_graph.edge_types)
-else:
-    print("PyG demo skipped. Set JOUVENCE_EXPLORER_BUILD_PYG=1 to build a bounded local HeteroData export.")
+for node_type in pyg_batch.node_types:
+    coverage = (
+        float(pyg_batch[node_type].x_mask.float().mean())
+        if hasattr(pyg_batch[node_type], "x_mask") else None
+    )
+    print(node_type, "nodes=", pyg_batch[node_type].num_nodes, "embedding coverage=", coverage)
 """),
         md("""
-### Direct PyG interpretation
+### Traverse every materialized relation for one epoch
 
-For an edge type such as `("disease", "disease_associated_gene", "gene")`, `edge_index[0]` contains integer indices into the disease node map and `edge_index[1]` indices into the gene node map. Reverse edges are explicit and use a `rev_...` relation name. Always keep the exported `node_maps/*.parquet` files: tensor indices are not biological identifiers.
+Create a fresh iterator for every epoch. The loop below is the complete-data pattern; it is not executed by default in this explorer because it would intentionally traverse the entire KG. Set the flag only on an approved in-region worker.
+"""),
+        code("""
+RUN_COMPLETE_MINIBATCH_EPOCH = os.environ.get("JOUVENCE_EXPLORER_FULL_PYG_EPOCH") == "1"
+materialized_relation_names = sorted(inventory.loc[inventory["layer"].eq("edges"), "name"].unique())
+
+def minibatches_for_epoch():
+    return iter_kg_minibatches(
+        str(canonical_root),
+        materialized_relation_names,
+        batch_size=MINIBATCH_SIZE,
+        embeddings=embedding_specs,
+        edge_feature_columns=("credibility", "score"),
+        billing_project=BILLING_PROJECT,
+        strict_embeddings=False,
+    )
+
+if RUN_COMPLETE_MINIBATCH_EPOCH:
+    relation_edge_counts = {}
+    for relation_name, batch in minibatches_for_epoch():
+        # Training step goes here: move this batch to the accelerator, forward,
+        # backward, optimizer.step(), then release it before the next batch.
+        relation_edge_counts[relation_name] = relation_edge_counts.get(relation_name, 0) + batch.num_edges
+    display(pd.Series(relation_edge_counts, name="edges_seen").sort_index())
+else:
+    print("Complete epoch skipped. Set JOUVENCE_EXPLORER_FULL_PYG_EPOCH=1 on an approved in-region worker.")
+"""),
+        md("""
+### What is and is not loaded
+
+Each yielded `HeteroData` contains:
+
+- endpoint node IDs and selected node-table metadata;
+- node embeddings in `.x` where an accepted table exists;
+- `.x_mask` so missing embeddings remain explicit rather than becoming fake random vectors;
+- local `edge_index` for the current batch;
+- numeric edge features in `edge_attr` and their names in `edge_attr_names`;
+- canonical `edge_id` strings;
+- matching provenance rows in `evidence_records`, with `evidence_to_edge`
+  mapping every evidence row to its local edge.
+
+Evidence is loaded dynamically but deliberately not coerced into message-passing
+features: it remains typed provenance for an assertion. A model can derive a
+reviewed evidence feature from these rows without losing the original records.
 """),
         md("""
 ## 9. Regenerate and validate
 
 ```bash
-uv run python scripts/build_data_explorer_notebook.py
+uv run --group notebooks python scripts/build_data_explorer_notebook.py
 JOUVENCE_BILLING_PROJECT='<your-project>' \
-  uv run python scripts/check_data_explorer_notebook.py --execute
+  uv run --group notebooks --group gnn python scripts/check_data_explorer_notebook.py --execute
 ```
 
-The committed notebook is deterministic and output-free. Live execution evidence belongs outside the committed `.ipynb`. For exhaustive scans, large UMAPs, or full PyG exports, create a reviewed in-region worker task rather than raising laptop bounds.
+The committed notebook is deterministic and output-free. Live execution evidence belongs outside the committed `.ipynb`. Full epochs should run in-region. If training needs shuffled multi-hop neighborhoods rather than sequential edge batches, build a versioned disk-backed adjacency/GraphStore index; do not fall back to a monolithic `.pt`.
 """),
     ]
 

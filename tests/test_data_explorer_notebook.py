@@ -112,10 +112,17 @@ def test_notebook_teaches_named_loading_graph_links_umap_gaps_and_pyg() -> None:
     assert "staging_objects" in text
     assert 'columns=["node_type", "primary_ontology"]' in text
 
-    # Show both a bounded export and the actual PyG load surface.
-    assert "BuildConfig(" in text
-    assert "build_pyg_export" in text
-    assert "pickle.load" in text
+    # Stream canonical Parquets; never build or load a whole-graph pickle.
+    assert "iter_relation_minibatches" in text
+    assert "EmbeddingSpec(" in text
+    assert "edge minibatching" in text
+    assert "neighbor sampling" in text
+    assert "evidence_records" in text
+    assert "evidence_to_edge" in text
+    assert "BuildConfig(" not in text
+    assert "build_pyg_export" not in text
+    assert "full_graph.pt" not in text
+    assert "pickle.load" not in text
     assert "torch.load(handle" not in text
     assert "HeteroData" in text
     assert "umap-learn" in (ROOT / "pyproject.toml").read_text()
