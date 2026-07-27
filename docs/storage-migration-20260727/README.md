@@ -23,10 +23,10 @@ gs://jouvencekb/
 GCS has no real directories. `edges_inferred/` and `evidence_inferred/` remain
 absent while they contain no accepted Parquet tables.
 
-Temporary candidates now belong in `gs://jouvencekb-staging`, which has a
-14-day deletion lifecycle. LaminDB internals now belong in
-`gs://jouvencekb-lamin`, which has a seven-day soft-delete policy. The stable
-bucket itself also has seven-day soft delete.
+Temporary candidates now belong in the separate `gs://jouvencekb-staging`
+bucket, covered by a bucket-wide 14-day deletion lifecycle. LaminDB internals
+live under `gs://jouvencekb/.lamin`; they share the stable bucket's seven-day soft-delete guard
+but are explicitly excluded from the public data contract.
 
 ## Frozen pre-migration evidence
 
@@ -127,12 +127,20 @@ not material to copy into the new short-lived staging bucket.
 
 ## LaminDB separation
 
-All 65 objects under old `lamin/` were copied to `gs://jouvencekb-lamin/lamin`
-and verified byte-identical by size and CRC32C. The 7.83 GB SQLite database was
-copied and then intentionally updated so its single `lamindb_storage.root` row
-is `gs://jouvencekb-lamin/lamin`; its differing CRC is therefore expected.
-Readback of the updated database returned exactly that root. Local instance
-configuration also points to `gs://jouvencekb-lamin`.
+The auxiliary `jouvencekb-lamin` bucket was repatriated under
+`gs://jouvencekb/.lamin` before that bucket was deleted. All 72 source objects
+(22,159,113,681 bytes) first passed size and CRC32C/MD5 equality. The usable
+3.01 GB catalog was then repaired transactionally: storage roots now resolve to
+`gs://jouvencekb/.lamin/lamin` and `gs://jouvencekb/main`, all 79 catalog keys
+were rewritten from `kg/v2/...` to flat `main/...` paths, and SQLite
+`quick_check` returned `ok`. It catalogs 60 Lamin-managed UID objects and 19
+direct canonical artifacts. Local instance configuration points to
+`gs://jouvencekb/.lamin`.
+
+The temporary staging bucket contained zero objects, so there was nothing to
+repatriate under the stable bucket. `gs://jouvencekb-staging` was recreated as
+the only future staging namespace, with bucket-wide deletion after 14 days and
+seven-day soft delete. The stable bucket has no `staging/` prefix or lifecycle.
 
 ## Repository cutover and validation
 
@@ -140,7 +148,7 @@ Active code, tests, notebook generator, operator docs, and `AGENTS.md` use:
 
 - canonical: `gs://jouvencekb/main`;
 - staging: `gs://jouvencekb-staging`;
-- Lamin runtime: `gs://jouvencekb-lamin`.
+- Lamin runtime: `gs://jouvencekb/.lamin`.
 
 Historical dated reports retain old paths as historical evidence. A new
 `scripts/check_storage_layout_contract.py` guard rejects legacy roots in active

@@ -46,7 +46,7 @@ Jouvence uses **location as part of the data contract**:
 | Canonical observations | `gs://jouvencekb/main/{nodes,edges,evidence,features,embeddings}` | Reviewed, promoted objects in the canonical data plane |
 | Canonical inferred outputs | `gs://jouvencekb/main/{edges_inferred,evidence_inferred}` | Reviewed derived links, kept separate from observations |
 | Non-canonical candidates | `gs://jouvencekb-staging` | Temporary candidate, partial, deferred, or pre-promotion artifacts |
-| LaminDB internals | `gs://jouvencekb-lamin` | Runtime/catalog state; never a public Parquet surface |
+| LaminDB internals | `gs://jouvencekb/.lamin` | Runtime/catalog state; never a public Parquet surface |
 
 **Canonical does not mean biologically true.** It means the object passed the project's promotion/review contract. An inferred edge is still an inference even when stored canonically.
 """),

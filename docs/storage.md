@@ -1,21 +1,25 @@
 # Jouvence KG storage
 
-The stable production surface is `gs://jouvencekb`. It is deliberately separate
-from temporary builders and LaminDB internals.
+Stable data and LaminDB state share `gs://jouvencekb`; temporary candidates use
+the separate `gs://jouvencekb-staging` bucket so an aggressive lifecycle can
+never touch canonical data. Only `raw/` and `main/` are stable public data.
 
-## Buckets
+## Namespaces
 
 | Purpose | URI | Contract |
 |---|---|---|
-| Stable public data | `gs://jouvencekb` | Only `README.md`, `raw/`, and `main/` |
+| Stable public data | `gs://jouvencekb/{raw,main}` | Durable, reviewed data |
 | Temporary candidates | `gs://jouvencekb-staging` | Non-canonical; lifecycle deletion after 14 days |
-| LaminDB internals | `gs://jouvencekb-lamin` | SQLite instance data and Lamin-managed storage only |
+| LaminDB internals | `gs://jouvencekb/.lamin` | Hidden runtime/catalog state; not a public data layer |
 
 ## Stable layout
 
 ```text
 gs://jouvencekb/
 ├── README.md
+├── .lamin/
+│   ├── .lamindb/lamin.db
+│   └── lamin/...
 ├── raw/
 │   └── <source>.<native-format>
 └── main/
@@ -26,6 +30,9 @@ gs://jouvencekb/
     ├── evidence_inferred/<relation>.parquet
     ├── features/<feature>.parquet
     └── embeddings/<entity>-<modality>-<model>.parquet
+
+gs://jouvencekb-staging/
+└── <task-or-build-id>/...
 ```
 
 GCS has no real empty directories. The inferred prefixes are absent while there
@@ -61,6 +68,7 @@ Use:
 - canonical read root: `gs://jouvencekb/main`
 - raw source root: `gs://jouvencekb/raw`
 - candidate write root: `gs://jouvencekb-staging/<task-or-build-id>`
+- LaminDB storage root: `gs://jouvencekb/.lamin`
 
 For FUSE, mount the bucket root and point code at `<mount>/main`; do not recreate
 a local `kg/v2` alias.
@@ -78,9 +86,10 @@ a local `kg/v2` alias.
 6. Delete or allow lifecycle deletion of the staging candidate only after the
    canonical readback passes.
 
-Never create `staged/`, `staging/`, `metadata/`, `proof/`, `archive/`,
-`viewer-bundles/`, model checkpoints, or runtime-state prefixes under
-`gs://jouvencekb`.
+Never create `staged/`, `staging/`, `metadata/`, `proof/`, or `archive/` in the
+stable bucket or inside `main/`. Candidate bundles, checkpoints, and transient
+reports belong only in `gs://jouvencekb-staging`; LaminDB-owned runtime state
+belongs only below `.lamin/`.
 
 ## Atomic writes
 
@@ -97,6 +106,6 @@ The live machine-readable inventory and generated dataset pages live under
 where applicable. Promotion receipts and detailed migration manifests are Git
 artifacts, not a bucket namespace.
 
-The stable bucket has a seven-day soft-delete policy as a recovery guard. The
-staging bucket has a 14-day deletion lifecycle and must never be treated as a
-durable archive.
+Both buckets have a seven-day soft-delete policy as a short recovery guard. The
+staging bucket additionally deletes all live objects after 14 days; staging must
+never be treated as a durable archive.
