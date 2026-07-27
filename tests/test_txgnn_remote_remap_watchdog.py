@@ -1,7 +1,6 @@
 import importlib.util
 import sys
 from pathlib import Path
-from subprocess import CompletedProcess
 
 WATCHDOG_PATH = Path("/Users/jkobject/.hermes/scripts/txgnn_remote_remap_watchdog.py")
 _spec = importlib.util.spec_from_file_location("txgnn_remote_remap_watchdog", WATCHDOG_PATH)
@@ -86,53 +85,12 @@ def test_acknowledged_completion_reason_rejects_validation_inconsistency() -> No
     ) is None
 
 
-def test_main_is_quiet_for_repeated_validated_completion(monkeypatch, capsys) -> None:
-    monkeypatch.setattr(watchdog, "dns_probe", lambda: (True, "ok"))
-    monkeypatch.setattr(
-        watchdog,
-        "run_once",
-        lambda: CompletedProcess(
-            watchdog.CMD,
-            0,
-            "✅ remote ReMap complete 3327980/3327980 rows\n",
-            "",
-        ),
-    )
-    monkeypatch.setattr(watchdog, "load_validation_evidence", lambda: VALIDATED_EVIDENCE)
+def test_main_is_retired_silent_and_does_not_touch_remote(monkeypatch, capsys) -> None:
+    calls = []
+    monkeypatch.setattr(watchdog, "vm_status", lambda: calls.append("vm_status"))
+    monkeypatch.setattr(watchdog, "dns_probe", lambda: calls.append("dns_probe"))
+    monkeypatch.setattr(watchdog, "run_once", lambda: calls.append("run_once"))
 
     assert watchdog.main() == 0
     assert capsys.readouterr().out == ""
-
-
-def test_main_preserves_alert_for_new_run_identity(monkeypatch, capsys) -> None:
-    remote_output = "✅ remote ReMap complete 3327980/3327980 rows run_dir=/different/run\n"
-    monkeypatch.setattr(watchdog, "dns_probe", lambda: (True, "ok"))
-    monkeypatch.setattr(
-        watchdog,
-        "run_once",
-        lambda: CompletedProcess(watchdog.CMD, 0, remote_output, ""),
-    )
-    monkeypatch.setattr(watchdog, "load_validation_evidence", lambda: VALIDATED_EVIDENCE)
-
-    assert watchdog.main() == 0
-    assert capsys.readouterr().out == remote_output
-
-
-def test_main_preserves_alert_for_remote_stderr(monkeypatch, capsys) -> None:
-    monkeypatch.setattr(watchdog, "dns_probe", lambda: (True, "ok"))
-    monkeypatch.setattr(
-        watchdog,
-        "run_once",
-        lambda: CompletedProcess(
-            watchdog.CMD,
-            0,
-            "✅ remote ReMap complete 3327980/3327980 rows\n",
-            "remote warning\n",
-        ),
-    )
-    monkeypatch.setattr(watchdog, "load_validation_evidence", lambda: VALIDATED_EVIDENCE)
-
-    assert watchdog.main() == 0
-    output = capsys.readouterr().out
-    assert "remote ReMap complete 3327980/3327980 rows" in output
-    assert "remote warning" in output
+    assert calls == []

@@ -14,9 +14,9 @@ Do **not** use `.omoc` for new work. It is a legacy scratch/cache location from 
 - `gs://jouvencekb/kg/staging/...` for remote staged artifacts;
 - canonical writes only under `gs://jouvencekb/kg/v2/...` after validation + review.
 
-Heavy Jouvence jobs are VM-only. Any card that may run LaminDB full/bulk syncs, production/full PyG/GNN exports or training, ReMap scaling, embeddings/full-KG scans, all-relation reads, or bulk canonical KG reads/writes must state `must_run_on=txgnn-worker` (the retained VM name) or another explicitly approved in-region worker, use `gs://jouvencekb/kg/v2` as source, and forbid `/Users/jkobject/mnt/gcs/...` / macOS GCS-FUSE for heavy work. Required preflight: verify `hostname`, launch/inspect with `gcloud compute ssh txgnn-worker`, check for an existing related writer/process, and fail if any heavy input/output path starts with `/Users/jkobject/mnt/gcs`. Copyable card template: `artifacts/reports/t_d682b7ad/heavy_job_vm_only_card_template.md`.
+Heavy Jouvence jobs are VM-only. Any card that may run LaminDB full/bulk syncs, production/full PyG/GNN exports or training, embeddings/full-KG scans, all-relation reads, or bulk canonical KG reads/writes must state `must_run_on=txgnn-worker` (the retained VM name) or another explicitly approved in-region worker, use `gs://jouvencekb/kg/v2` as source, and forbid `/Users/jkobject/mnt/gcs/...` / macOS GCS-FUSE for heavy work. Required preflight: verify `hostname`, launch/inspect with `gcloud compute ssh txgnn-worker`, check for an existing related writer/process, and fail if any heavy input/output path starts with `/Users/jkobject/mnt/gcs`. Copyable card template: `artifacts/reports/t_d682b7ad/heavy_job_vm_only_card_template.md`. ReMap route C is complete and unsupervised; these generic VM rules do not authorize or resume ReMap work.
 
-ReMap fresh-UDC continuations: foreground Kanban cards should use `--max-tiles 5`. Larger bounded continuations require a local/background supervisor with explicit heartbeat/progress JSON, stdout/stderr/rc capture, task-local fresh UDC, and canonical-negative validation/enforcement. Never reuse the old suspected-corrupt `artifacts/cache/t_1bc29376/udc` cache (relative, absolute, or descendant spellings are supervisor-rejected after path normalization). Full/unbounded caps (`--max-tiles >= 3220`, including `3220`) are rejected unless `--reviewed-full-run-override` is supplied after a separate reviewed operations gate; do not use the override for normal bounded continuations. Current supervisor template: `artifacts/reports/t_a2674d49/remap_fresh_udc_supervisor.py`; plan: `artifacts/reports/t_a2674d49/remap_supervisor_plan.md`.
+ReMap route C is complete and has no active watchdog, resume loop, SSH-liveness gate, or recovery lane. Prior fresh-UDC continuation rules and supervisor templates are preserved as historical reproducibility evidence only; they are not current operating instructions and must not be auto-resumed.
 
 Verified KG access:
 
@@ -71,7 +71,7 @@ Use these, not old `.omoc` reports:
 Accepted snapshot:
 
 - active declared relations: `67`
-- canonical active edge relations: `40`, including three `canonical promoted`/`review-required` relations pending acceptance
+- canonical active edge relations: `40`; the three previously review-required canonical writes are independently review-accepted at their unchanged object generations by `t_2d1f767d`
 - canonical relations with evidence: `18`
 - canonical relations without evidence: `22`
 - declared relations not canonical yet: `27`
@@ -116,7 +116,7 @@ Four source-backed embedding families now have one independently validated immut
 
 ### 4. ReMap
 
-All-peak ReMap is stopped/deferred. Do not auto-resume.
+ReMap route C is complete and unsupervised. The accepted support-only artifacts remain preserved, while all-peak expansion and graph-topology conversion remain deferred; do not auto-resume either line.
 
 Accepted staged-only support artifacts:
 
@@ -134,13 +134,13 @@ Canonical-readiness decision:
 
 ### 5. Mutation genomic direct relations
 
-`mutation_affects_transcript` is canonical promoted/review-accepted from the all-part OpenTargets 26.03 candidate. `mutation_in_gene` is now relation-specific canonical promoted/review-required by `t_1cfcd48f` from the full all-25-part containment-gated candidate (`t_2bb8e7de`) using OpenTargets `target.genomicLocation`, with 2,599,525 edge/evidence/proof rows and passing live canonical endpoint, duplicate/gap, containment, leakage, staged/canonical sha256, and edge/evidence audit gates. `mutation_overlaps_enhancer` is canonical promoted/review-required by `t_00551bc3` only for the reviewed non-context-support-gated `t_73c67c1b` candidate (1,664,278 edge/evidence rows); coordinate overlap alone remains context/support-only and not observed regulatory evidence.
+`mutation_affects_transcript`, `mutation_in_gene`, and the support-gated `mutation_overlaps_enhancer` candidate are canonical promoted/review-accepted. Consolidated reviewer `t_2d1f767d` reconfirmed the exact unchanged object generations and relation-specific gates. `mutation_in_gene` remains the containment-gated OpenTargets `target.genomicLocation` relation with 2,599,525 edge/evidence/proof rows. `mutation_overlaps_enhancer` remains limited to the reviewed non-context-support-gated `t_73c67c1b` candidate (1,664,278 edge/evidence rows); coordinate overlap alone remains context/support-only and not observed regulatory evidence.
 
 Relations:
 
 - `mutation_affects_transcript` — `canonical promoted` / reviewed.
-- `mutation_in_gene` — `canonical promoted` / `review-required`; relation-specific canonical write done by `t_1cfcd48f`, pending independent acceptance.
-- `mutation_overlaps_enhancer` — `canonical promoted` / `review-required` for the support-gated `t_73c67c1b` candidate promoted by `t_00551bc3`; coordinate-only overlap remains context/support-only and not observed regulatory evidence.
+- `mutation_in_gene` — `canonical promoted` / `review-accepted`; relation-specific canonical write by `t_1cfcd48f`, accepted by `t_18a346a4` and reconfirmed by `t_2d1f767d`.
+- `mutation_overlaps_enhancer` — `canonical promoted` / `review-accepted` for the support-gated `t_73c67c1b` candidate promoted by `t_00551bc3`; coordinate-only overlap remains context/support-only and not observed regulatory evidence.
 
 Cards:
 
@@ -150,9 +150,9 @@ Cards:
 - `t_8de911c0` — remaining-relation next-state decision: `mutation_in_gene` bounded containment candidate only; `mutation_overlaps_enhancer` coordinate-only context/support feature; no broad or relation-specific promotion card created.
 - `t_0aa76f3b` — support-gated `mutation_overlaps_enhancer` policy/pilot: evidence-backed staged edge candidate with external support context, no canonical write.
 - `t_73c67c1b` — full non-context-support-gated `mutation_overlaps_enhancer` staged candidate: 1,664,278 edges/evidence rows with live endpoint anti-joins and edge/evidence validation passing. Report: `docs/mutation_overlaps_enhancer_support_gated_full_t_73c67c1b.md`.
-- `t_00551bc3` — relation-specific canonical promotion of reviewed `t_73c67c1b` support-gated `mutation_overlaps_enhancer` to `gs://jouvencekb/kg/v2/{edges,evidence}/`; status `canonical promoted`/`review-required` pending independent acceptance. Report: `docs/mutation_overlaps_enhancer_canonical_promotion_t_00551bc3.md`.
+- `t_00551bc3` — relation-specific canonical promotion of reviewed `t_73c67c1b` support-gated `mutation_overlaps_enhancer` to `gs://jouvencekb/kg/v2/{edges,evidence}/`; status `canonical promoted`/`review-accepted` by `t_d11a3bb7`, reconfirmed by `t_2d1f767d`. Report: `docs/mutation_overlaps_enhancer_canonical_promotion_t_00551bc3.md`.
 - `t_2bb8e7de` — full all-25-part `mutation_in_gene` containment-gated staged candidate built/validated under `artifacts/staged/t_2bb8e7de/`; producer handoff was `review-required`, with no canonical write.
-- `t_1cfcd48f` — `mutation_in_gene` live endpoint revalidation and relation-specific canonical write to `gs://jouvencekb/kg/v2/{edges,evidence,proof}/`; status `review-required` pending independent review. Report: `docs/mutation_in_gene_canonical_promotion_t_1cfcd48f.md`.
+- `t_1cfcd48f` — `mutation_in_gene` live endpoint revalidation and relation-specific canonical write to `gs://jouvencekb/kg/v2/{edges,evidence,proof}/`; status `canonical promoted`/`review-accepted` by `t_18a346a4`, reconfirmed by `t_2d1f767d`. Report: `docs/mutation_in_gene_canonical_promotion_t_1cfcd48f.md`.
 - `t_4b1227b3` — do not use as blanket promotion; only relation-specific promotion after explicit acceptance.
 
 ### 6. Relation waves
