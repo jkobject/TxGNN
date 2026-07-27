@@ -42,7 +42,8 @@ def test_data_explorer_is_deterministic_and_bounded(tmp_path: Path) -> None:
     assert "kg-fixture" not in text
     assert "fixture_rule_engine" not in text
     assert "JOUVENCE_DATA_MODE" not in text
-    assert "SELECTED_URI" in text
+    assert "SELECTED_LAYER" in text
+    assert "SELECTED_NAME" in text
     assert "/Users/jkobject/mnt/gcs" not in text
     assert "jkobject-1549353370965" not in text
     assert all(not cell.get("outputs") for cell in notebook.cells if cell.cell_type == "code")
@@ -85,6 +86,39 @@ def test_live_only_roots_all_use_requester_pays_project() -> None:
     assert "JOUVENCE_STAGING_ROOT" not in text
     assert "billing_project=BILLING_PROJECT" in text
     assert "_storage_options(uri, BILLING_PROJECT)" in text
+
+
+def test_notebook_teaches_named_loading_graph_links_umap_gaps_and_pyg() -> None:
+    notebook = nbformat.read(NOTEBOOK, as_version=4)
+    text = "\n".join(str(cell.source) for cell in notebook.cells)
+
+    # One exact layer/name selection surface rather than forcing users to copy URIs.
+    assert "def uri_for(layer: str, name: str)" in text
+    assert "def load_table(layer: str, name: str" in text
+    assert "files_by_type" in text
+    assert "full_table_statistics" in text
+
+    # Executable relational walkthroughs across the graph and provenance layers.
+    assert "node → edge → node" in text
+    assert "edge_with_endpoints" in text
+    assert "edge_with_evidence" in text
+    assert 'on=["relation", "x_id", "x_type", "y_id", "y_type"]' in text
+
+    # Embeddings and backlog/gap views are explicit and bounded.
+    assert "UMAP" in text
+    assert "PCA fallback" in text
+    assert "embedding_projection" in text
+    assert "schema_relations_absent_from_kg" in text
+    assert "staging_objects" in text
+    assert 'columns=["node_type", "primary_ontology"]' in text
+
+    # Show both a bounded export and the actual PyG load surface.
+    assert "BuildConfig(" in text
+    assert "build_pyg_export" in text
+    assert "pickle.load" in text
+    assert "torch.load(handle" not in text
+    assert "HeteroData" in text
+    assert "umap-learn" in (ROOT / "pyproject.toml").read_text()
 
 
 def test_local_listing_is_early_bounded(

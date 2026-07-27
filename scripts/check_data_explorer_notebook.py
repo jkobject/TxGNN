@@ -23,10 +23,12 @@ REQUIRED = [
     "live-gcs-only",
     "read_bounded_parquet",
     "list_parquet_uris",
-    "server-side GCS cap",
+    "server-side cap",
     "parquet_footer",
-    "Embedding Parquets discovered",
-    "join on stable edge identity",
+    "embedding_projection",
+    "stable join",
+    "schema_relations_absent_from_kg",
+    "build_pyg_export",
 ]
 FORBIDDEN = [
     "/Users/jkobject/mnt/gcs",
@@ -58,8 +60,9 @@ def check() -> dict[str, object]:
             failures.append(f"forbidden token: {token}")
     if len(notebook.cells) < 18:
         failures.append("explorer is missing meaningful workflow sections")
-    if not any("SELECTED_URI" in str(cell.source) for cell in notebook.cells if cell.cell_type == "code"):
-        failures.append("missing editable object selector")
+    selector_text = "\n".join(str(cell.source) for cell in notebook.cells if cell.cell_type == "code")
+    if "SELECTED_LAYER" not in selector_text or "SELECTED_NAME" not in selector_text:
+        failures.append("missing editable layer/name selector")
     for cell in notebook.cells:
         if cell.cell_type == "code" and (cell.get("outputs") or cell.get("execution_count") is not None):
             failures.append("committed notebook contains execution output")
