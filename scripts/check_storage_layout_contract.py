@@ -10,11 +10,13 @@ ACTIVE_ROOTS = (
     ROOT / "manage_db",
     ROOT / "scripts",
     ROOT / "envs",
+    ROOT / "todo.d",
     ROOT / "docs" / "guides",
 )
-ACTIVE_FILES = (
+SINGLE_FILES = (
     ROOT / "AGENTS.md",
     ROOT / "README.md",
+    ROOT / "TODO.md",
     ROOT / "docs" / "storage.md",
     ROOT / "docs" / "getting-started-data.md",
 )
@@ -38,7 +40,7 @@ ALLOWED_TOP_LEVEL_PREFIXES = {"raw/", "main/"}
 
 
 def active_files() -> list[Path]:
-    paths = list(ACTIVE_FILES)
+    paths = list(SINGLE_FILES)
     for root in ACTIVE_ROOTS:
         paths.extend(
             path

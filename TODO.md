@@ -11,17 +11,17 @@ Do **not** use `.omoc` for new work. It is a legacy scratch/cache location from 
 - `artifacts/staged/<task-id>/` for local staged artifacts;
 - `artifacts/cache/<task-id>/` for bounded local cache if unavoidable;
 - `docs/` for human-readable reports;
-- `gs://jouvencekb/kg/staging/...` for remote staged artifacts;
-- canonical writes only under `gs://jouvencekb/kg/v2/...` after validation + review.
+- `gs://jouvencekb-staging/...` for remote staged artifacts;
+- canonical writes only under `gs://jouvencekb/main/...` after validation + review.
 
-Heavy Jouvence jobs are VM-only. Any card that may run LaminDB full/bulk syncs, production/full PyG/GNN exports or training, embeddings/full-KG scans, all-relation reads, or bulk canonical KG reads/writes must state `must_run_on=txgnn-worker` (the retained VM name) or another explicitly approved in-region worker, use `gs://jouvencekb/kg/v2` as source, and forbid `/Users/jkobject/mnt/gcs/...` / macOS GCS-FUSE for heavy work. Required preflight: verify `hostname`, launch/inspect with `gcloud compute ssh txgnn-worker`, check for an existing related writer/process, and fail if any heavy input/output path starts with `/Users/jkobject/mnt/gcs`. Copyable card template: `artifacts/reports/t_d682b7ad/heavy_job_vm_only_card_template.md`. ReMap route C is complete and unsupervised; these generic VM rules do not authorize or resume ReMap work.
+Heavy Jouvence jobs are VM-only. Any card that may run LaminDB full/bulk syncs, production/full PyG/GNN exports or training, embeddings/full-KG scans, all-relation reads, or bulk canonical KG reads/writes must state `must_run_on=txgnn-worker` (the retained VM name) or another explicitly approved in-region worker, use `gs://jouvencekb/main` as source, and forbid `/Users/jkobject/mnt/gcs/...` / macOS GCS-FUSE for heavy work. Required preflight: verify `hostname`, launch/inspect with `gcloud compute ssh txgnn-worker`, check for an existing related writer/process, and fail if any heavy input/output path starts with `/Users/jkobject/mnt/gcs`. Copyable card template: `artifacts/reports/t_d682b7ad/heavy_job_vm_only_card_template.md`. ReMap route C is complete and unsupervised; these generic VM rules do not authorize or resume ReMap work.
 
 ReMap route C is complete and has no active watchdog, resume loop, SSH-liveness gate, or recovery lane. Prior fresh-UDC continuation rules and supervisor templates are preserved as historical reproducibility evidence only; they are not current operating instructions and must not be auto-resumed.
 
 Verified KG access:
 
-- GCS canonical root: `gs://jouvencekb/kg/v2`
-- macOS FUSE root: `/Users/jkobject/mnt/gcs/jouvencekb-kg/v2` for small bounded/local inspection only; forbidden for heavy LaminDB/PyG/ReMap/embedding/full-KG work.
+- GCS canonical root: `gs://jouvencekb/main`
+- macOS FUSE root: `/Users/jkobject/mnt/gcs/jouvencekb/main` for small bounded/local inspection only; forbidden for heavy LaminDB/PyG/ReMap/embedding/full-KG work.
 
 ## Status vocabulary
 
@@ -121,9 +121,9 @@ ReMap route C is complete and unsupervised. The accepted support-only artifacts 
 Accepted staged-only support artifacts:
 
 - `t_3b8a2c4d` — CRM support/QA first10k chr1 pilot.
-- Prefix: `gs://jouvencekb/kg/staging/source-native-expansion/remap-crm-tf-binds-enhancer-support-chr1-first10k-20260623-t_3b8a2c4d/`
+- Prefix: `gs://jouvencekb-staging/source-native-expansion/remap-crm-tf-binds-enhancer-support-chr1-first10k-20260623-t_3b8a2c4d/`
 - `t_b599d3bb` — CRM support/QA all-chromosome bounded 5k-per-chrom artifact; staged-only/support-only.
-- Prefix: `gs://jouvencekb/kg/staging/source-native-expansion/remap-crm-tf-binds-enhancer-support-allchrom-5kperchrom-20260623-t_b599d3bb/all_chrom_5k_per_chrom/`
+- Prefix: `gs://jouvencekb-staging/source-native-expansion/remap-crm-tf-binds-enhancer-support-allchrom-5kperchrom-20260623-t_b599d3bb/all_chrom_5k_per_chrom/`
 
 Canonical-readiness decision:
 
@@ -150,9 +150,9 @@ Cards:
 - `t_8de911c0` — remaining-relation next-state decision: `mutation_in_gene` bounded containment candidate only; `mutation_overlaps_enhancer` coordinate-only context/support feature; no broad or relation-specific promotion card created.
 - `t_0aa76f3b` — support-gated `mutation_overlaps_enhancer` policy/pilot: evidence-backed staged edge candidate with external support context, no canonical write.
 - `t_73c67c1b` — full non-context-support-gated `mutation_overlaps_enhancer` staged candidate: 1,664,278 edges/evidence rows with live endpoint anti-joins and edge/evidence validation passing. Report: `docs/mutation_overlaps_enhancer_support_gated_full_t_73c67c1b.md`.
-- `t_00551bc3` — relation-specific canonical promotion of reviewed `t_73c67c1b` support-gated `mutation_overlaps_enhancer` to `gs://jouvencekb/kg/v2/{edges,evidence}/`; status `canonical promoted`/`review-accepted` by `t_d11a3bb7`, reconfirmed by `t_2d1f767d`. Report: `docs/mutation_overlaps_enhancer_canonical_promotion_t_00551bc3.md`.
+- `t_00551bc3` — relation-specific canonical promotion of reviewed `t_73c67c1b` support-gated `mutation_overlaps_enhancer` to `gs://jouvencekb/main/{edges,evidence}/`; status `canonical promoted`/`review-accepted` by `t_d11a3bb7`, reconfirmed by `t_2d1f767d`. Report: `docs/mutation_overlaps_enhancer_canonical_promotion_t_00551bc3.md`.
 - `t_2bb8e7de` — full all-25-part `mutation_in_gene` containment-gated staged candidate built/validated under `artifacts/staged/t_2bb8e7de/`; producer handoff was `review-required`, with no canonical write.
-- `t_1cfcd48f` — `mutation_in_gene` live endpoint revalidation and relation-specific canonical write to `gs://jouvencekb/kg/v2/{edges,evidence,proof}/`; status `canonical promoted`/`review-accepted` by `t_18a346a4`, reconfirmed by `t_2d1f767d`. Report: `docs/mutation_in_gene_canonical_promotion_t_1cfcd48f.md`.
+- `t_1cfcd48f` — `mutation_in_gene` live endpoint revalidation and relation-specific canonical write to `gs://jouvencekb/main/{edges,evidence}/`; status `canonical promoted`/`review-accepted` by `t_18a346a4`, reconfirmed by `t_2d1f767d`. Report: `docs/mutation_in_gene_canonical_promotion_t_1cfcd48f.md`.
 - `t_4b1227b3` — do not use as blanket promotion; only relation-specific promotion after explicit acceptance.
 
 ### 6. Relation waves

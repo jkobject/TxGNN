@@ -2,7 +2,7 @@
 
 _Last verified: 2026-07-15. Kanban board `txgnn` remains the live source of truth._
 
-Heavy-job guardrail: production/full PyG exports and training must run on `txgnn-worker` or another approved in-region worker with `gs://jouvencekb/kg/v2`. Do not run full-KG work through macOS GCS-FUSE.
+Heavy-job guardrail: production/full PyG exports and training must run on `txgnn-worker` or another approved in-region worker with `gs://jouvencekb/main`. Do not run full-KG work through macOS GCS-FUSE.
 
 ## Current verdict
 
