@@ -137,6 +137,12 @@ were rewritten from `kg/v2/...` to flat `main/...` paths, and SQLite
 direct canonical artifacts. Local instance configuration points to
 `gs://jouvencekb/.lamin`.
 
+After promoting the repaired catalog to `.lamin/.lamindb/lamin.db`, its
+redundant 3.01 GB source copy under `.lamin/lamin/.lamindb/lamin.db` was deleted
+with a generation precondition. The retained `.lamin/` surface is 71 objects
+(14,328,966,609 bytes): one active catalog plus Lamin-managed UID objects and
+their storage/exclusion metadata.
+
 The temporary staging bucket contained zero objects, so there was nothing to
 repatriate under the stable bucket. `gs://jouvencekb-staging` was recreated as
 the only future staging namespace, with bucket-wide deletion after 14 days and
