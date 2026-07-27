@@ -23,8 +23,8 @@ gs://jouvencekb/
 GCS has no real directories. `edges_inferred/` and `evidence_inferred/` remain
 absent while they contain no accepted Parquet tables.
 
-Temporary candidates now belong in the separate `gs://jouvencekb-staging`
-bucket, covered by a bucket-wide 14-day deletion lifecycle. LaminDB internals
+Temporary candidates now belong under `gs://jouvencekb/staging`, covered by a
+prefix-scoped 14-day deletion lifecycle. LaminDB internals
 live under `gs://jouvencekb/.lamin`; they share the stable bucket's seven-day soft-delete guard
 but are explicitly excluded from the public data contract.
 
@@ -144,16 +144,17 @@ with a generation precondition. The retained `.lamin/` surface is 71 objects
 their storage/exclusion metadata.
 
 The temporary staging bucket contained zero objects, so there was nothing to
-repatriate under the stable bucket. `gs://jouvencekb-staging` was recreated as
-the only future staging namespace, with bucket-wide deletion after 14 days and
-seven-day soft delete. The stable bucket has no `staging/` prefix or lifecycle.
+move. It was deleted. `gs://jouvencekb/staging/` is the only future staging
+namespace, with deletion after 14 days scoped by `matchesPrefix: ["staging/"]`.
+The bucket's seven-day soft-delete guard remains active, and the lifecycle does
+not match `raw/`, `main/`, or `.lamin/`.
 
 ## Repository cutover and validation
 
 Active code, tests, notebook generator, operator docs, and `AGENTS.md` use:
 
 - canonical: `gs://jouvencekb/main`;
-- staging: `gs://jouvencekb-staging`;
+- staging: `gs://jouvencekb/staging`;
 - Lamin runtime: `gs://jouvencekb/.lamin`.
 
 Historical dated reports retain old paths as historical evidence. A new

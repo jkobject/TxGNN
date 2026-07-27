@@ -80,7 +80,7 @@ def test_live_only_roots_all_use_requester_pays_project() -> None:
     text = "\n".join(str(cell.source) for cell in notebook.cells)
 
     assert "canonical_root = PUBLIC_KG_ROOT" in text
-    assert 'staging_root = "gs://jouvencekb-staging"' in text
+    assert 'staging_root = "gs://jouvencekb/staging"' in text
     assert "JOUVENCE_CANONICAL_ROOT" not in text
     assert "JOUVENCE_STAGING_ROOT" not in text
     assert "billing_project=BILLING_PROJECT" in text

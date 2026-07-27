@@ -444,7 +444,7 @@ def main() -> None:
         parquet_count = sum(x["metadata"]["name"].endswith(".parquet") for x in items)
         prefix_rows.append(
             {
-                "prefix": f"gs://jouvencekb-staging/{prefix}/",
+                "prefix": f"gs://jouvencekb/staging/{prefix}/",
                 "object_count": len(items),
                 "parquet_object_count": parquet_count,
                 "size_bytes": sum(int(x["metadata"].get("size", 0)) for x in items),

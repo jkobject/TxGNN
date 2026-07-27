@@ -15,7 +15,7 @@ Default KG access:
 - Verified macOS FUSE root: `/Users/jkobject/mnt/gcs/jouvencekb/main` for small bounded/local inspection only.
 - Heavy Jouvence jobs are VM-only: LaminDB full/bulk syncs, production/full PyG/GNN exports or training, ReMap scaling, embeddings/full-KG scans, all-relation reads, and bulk canonical KG reads/writes must run on `txgnn-worker` (retained VM name) or another explicitly approved in-region worker using `gs://jouvencekb/main`; do not run them through `/Users/jkobject/mnt/gcs/...` / macOS GCS-FUSE.
 - Heavy-card preflight must include `must_run_on=txgnn-worker`, `hostname`, `gcloud compute ssh txgnn-worker`, an existing-process check, and a hard failure if any heavy input/output path starts with `/Users/jkobject/mnt/gcs`.
-- New outputs: `artifacts/staged/<task-id>/`, `artifacts/cache/<task-id>/`, `docs/`, or `gs://jouvencekb-staging/...`
+- New outputs: `artifacts/staged/<task-id>/`, `artifacts/cache/<task-id>/`, `docs/`, or `gs://jouvencekb/staging/...`
 - `.omoc/` is legacy-only.
 - Jouvence automation is strictly project-scoped. Never stop, pause, resize, or otherwise manage `pert-gym` resources from a Jouvence task; another session may legitimately be using them.
 

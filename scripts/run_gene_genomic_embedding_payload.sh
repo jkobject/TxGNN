@@ -12,9 +12,9 @@ RECOVERED_SOURCE="$TASK_ROOT/v2-recovered-source"
 CANDIDATE_DIR="$TASK_ROOT/v2-candidate"
 BASE_DIR="$TASK_ROOT/v1-adopted-base"
 RECOVERY_REPORT="$TASK_ROOT/v2-recovery-source-report.json"
-GCS_ROOT=gs://jouvencekb-staging/gene-genomic-sequence-embeddings-20260722-t_03bf9e27-v2
-SOURCE_ORIGIN=gs://jouvencekb-staging/gene-genomic-sequence-20260625-t_720528ea
-BASE_ROOT=gs://jouvencekb-staging/gene-genomic-sequence-embeddings-20260721-t_03bf9e27
+GCS_ROOT=gs://jouvencekb/staging/gene-genomic-sequence-embeddings-20260722-t_03bf9e27-v2
+SOURCE_ORIGIN=gs://jouvencekb/staging/gene-genomic-sequence-20260625-t_720528ea
+BASE_ROOT=gs://jouvencekb/staging/gene-genomic-sequence-embeddings-20260721-t_03bf9e27
 HEARTBEAT_SOURCE="$TASK_ROOT/source/features/gene_genomic_sequence.parquet"
 
 write_heartbeat() {
@@ -101,7 +101,7 @@ HEARTBEAT_PID=$!
   --ensembl-gtf "$TASK_ROOT/source/Homo_sapiens.GRCh38.114.gtf.gz" \
   --adopted-base-embedding "$BASE_DIR/gene_genomic_sequence_nt.parquet" \
   --adopted-base-manifest "$BASE_DIR/manifest.json" \
-  --adopted-base-origin "gs://jouvencekb-staging/gene-genomic-sequence-embeddings-20260721-t_03bf9e27/embeddings/gene_genomic_sequence_nt.parquet" \
+  --adopted-base-origin "gs://jouvencekb/staging/gene-genomic-sequence-embeddings-20260721-t_03bf9e27/embeddings/gene_genomic_sequence_nt.parquet" \
   --recovery-report "$RECOVERY_REPORT" \
   --candidate-dir "$CANDIDATE_DIR" \
   --gcs-root "$GCS_ROOT" \

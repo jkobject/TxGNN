@@ -1,15 +1,16 @@
 # Jouvence KG storage
 
-Stable data and LaminDB state share `gs://jouvencekb`; temporary candidates use
-the separate `gs://jouvencekb-staging` bucket so an aggressive lifecycle can
-never touch canonical data. Only `raw/` and `main/` are stable public data.
+Stable data, LaminDB state, and temporary candidates share `gs://jouvencekb`
+under disjoint prefixes. Only `raw/` and `main/` are stable public data. A
+prefix-scoped lifecycle applies exclusively to `staging/`, never to canonical
+data or LaminDB state.
 
 ## Namespaces
 
 | Purpose | URI | Contract |
 |---|---|---|
 | Stable public data | `gs://jouvencekb/{raw,main}` | Durable, reviewed data |
-| Temporary candidates | `gs://jouvencekb-staging` | Non-canonical; lifecycle deletion after 14 days |
+| Temporary candidates | `gs://jouvencekb/staging` | Non-canonical; prefix-scoped lifecycle deletion after 14 days |
 | LaminDB internals | `gs://jouvencekb/.lamin` | Hidden runtime/catalog state; not a public data layer |
 
 ## Stable layout
@@ -31,8 +32,10 @@ gs://jouvencekb/
     ├── features/<feature>.parquet
     └── embeddings/<entity>-<modality>-<model>.parquet
 
-gs://jouvencekb-staging/
-└── <task-or-build-id>/...
+gs://jouvencekb/
+└── staging/
+    └── <task-or-build-id>/
+        └── ... temporary candidate outputs ...
 ```
 
 GCS has no real empty directories. The inferred prefixes are absent while there
@@ -67,7 +70,7 @@ Use:
 
 - canonical read root: `gs://jouvencekb/main`
 - raw source root: `gs://jouvencekb/raw`
-- candidate write root: `gs://jouvencekb-staging/<task-or-build-id>`
+- candidate write root: `gs://jouvencekb/staging/<task-or-build-id>`
 - LaminDB storage root: `gs://jouvencekb/.lamin`
 
 For FUSE, mount the bucket root and point code at `<mount>/main`; do not recreate
@@ -75,7 +78,7 @@ a local `kg/v2` alias.
 
 ## Publication protocol
 
-1. Build and validate in local scratch or `gs://jouvencekb-staging`.
+1. Build and validate in local scratch or `gs://jouvencekb/staging`.
 2. Freeze an immutable candidate generation and review its row/schema/evidence
    contract.
 3. Publish one flat Parquet to the appropriate `main/` layer using a
@@ -88,7 +91,7 @@ a local `kg/v2` alias.
 
 Never create `staged/`, `staging/`, `metadata/`, `proof/`, or `archive/` in the
 stable bucket or inside `main/`. Candidate bundles, checkpoints, and transient
-reports belong only in `gs://jouvencekb-staging`; LaminDB-owned runtime state
+reports belong only in `gs://jouvencekb/staging`; LaminDB-owned runtime state
 belongs only below `.lamin/`.
 
 ## Atomic writes

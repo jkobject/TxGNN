@@ -2,7 +2,7 @@
 
 This runbook is the default access path for workers using the Jouvence KG at `gs://jouvencekb/main`. Small bounded inspection may happen from the macOS worker environment, but heavy Jouvence work is VM-only. The filename and `txgnn-worker` VM name are retained compatibility identifiers.
 
-Emergency guardrail (`t_d682b7ad`): heavy LaminDB/PyG/ReMap/embedding/full-KG jobs must run on `txgnn-worker` or another explicitly approved in-region worker. Use `gs://jouvencekb/main` as the source for those jobs and `gs://jouvencekb-staging` for temporary outputs. Do **not** run heavy reads/writes through `/Users/jkobject/mnt/gcs/...` / macOS GCS-FUSE. Future heavy cards must state `must_run_on=txgnn-worker`, preflight `hostname`, use `gcloud compute ssh` for worker launch/inspection, check for an existing related writer/process, and fail immediately if any heavy input/output path starts with `/Users/jkobject/mnt/gcs`.
+Emergency guardrail (`t_d682b7ad`): heavy LaminDB/PyG/ReMap/embedding/full-KG jobs must run on `txgnn-worker` or another explicitly approved in-region worker. Use `gs://jouvencekb/main` as the source for those jobs and `gs://jouvencekb/staging` for temporary outputs. Do **not** run heavy reads/writes through `/Users/jkobject/mnt/gcs/...` / macOS GCS-FUSE. Future heavy cards must state `must_run_on=txgnn-worker`, preflight `hostname`, use `gcloud compute ssh` for worker launch/inspection, check for an existing related writer/process, and fail immediately if any heavy input/output path starts with `/Users/jkobject/mnt/gcs`.
 
 Status from verification on 2026-06-23:
 

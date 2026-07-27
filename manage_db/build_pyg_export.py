@@ -539,7 +539,7 @@ def _write_production_plan_manifest(
 ) -> dict[str, Any]:
     node_rows = {node_type: _parquet_num_rows(kg._node_internal(node_type), kg.fs) for node_type in node_types}
     edge_rows = {relation: _parquet_num_rows(kg._edge_internal(relation), kg.fs) for relation in relations}
-    remote_output_root = config.remote_output_root or posixpath.join("gs://jouvencekb-staging/ml/pyg", config.build_name)
+    remote_output_root = config.remote_output_root or posixpath.join("gs://jouvencekb/staging/ml/pyg", config.build_name)
     remote_command = _remote_build_command(config, node_types, relations, remote_output_root)
     edge_index_bytes = {relation: int(rows) * 2 * 8 for relation, rows in edge_rows.items()}
     edge_row_map_bytes_estimate = {relation: int(rows) * 128 for relation, rows in edge_rows.items()}

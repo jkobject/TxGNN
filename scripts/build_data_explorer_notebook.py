@@ -45,7 +45,7 @@ Jouvence uses **location as part of the data contract**:
 |---|---|---|
 | Canonical observations | `gs://jouvencekb/main/{nodes,edges,evidence,features,embeddings}` | Reviewed, promoted objects in the canonical data plane |
 | Canonical inferred outputs | `gs://jouvencekb/main/{edges_inferred,evidence_inferred}` | Reviewed derived links, kept separate from observations |
-| Non-canonical candidates | `gs://jouvencekb-staging` | Temporary candidate, partial, deferred, or pre-promotion artifacts |
+| Non-canonical candidates | `gs://jouvencekb/staging` | Temporary candidate, partial, deferred, or pre-promotion artifacts |
 | LaminDB internals | `gs://jouvencekb/.lamin` | Runtime/catalog state; never a public Parquet surface |
 
 **Canonical does not mean biologically true.** It means the object passed the project's promotion/review contract. An inferred edge is still an inference even when stored canonically.
@@ -113,7 +113,7 @@ The roots below are the real GCS locations. Normally you change nothing: ADC sup
 """),
         code("""
 canonical_root = PUBLIC_KG_ROOT
-staging_root = "gs://jouvencekb-staging"
+staging_root = "gs://jouvencekb/staging"
 if not BILLING_PROJECT:
     raise RuntimeError(
         "Could not infer a requester-pays project from ADC. Set "

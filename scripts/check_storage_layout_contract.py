@@ -24,7 +24,6 @@ TEXT_SUFFIXES = {".py", ".sh", ".md", ".toml", ".yaml", ".yml", ".json"}
 FORBIDDEN = (
     "gs://jouvencekb/kg/",
     "gs://jouvencekb/staged",
-    "gs://jouvencekb/staging",
     "gs://jouvencekb/metadata",
     "gs://jouvencekb/proof",
     "gs://jouvencekb/main/staged",
@@ -36,7 +35,7 @@ FORBIDDEN = (
     "/jouvencekb-kg/v2",
 )
 ALLOWED_TOP_LEVEL_OBJECTS = {"README.md"}
-ALLOWED_TOP_LEVEL_PREFIXES = {".lamin/", "raw/", "main/"}
+ALLOWED_TOP_LEVEL_PREFIXES = {".lamin/", "raw/", "main/", "staging/"}
 
 
 def active_files() -> list[Path]:
