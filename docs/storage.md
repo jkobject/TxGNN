@@ -1,18 +1,17 @@
 # Jouvence KG storage
 
-Stable data, durable derived PyG artifacts, LaminDB state, and temporary
+Stable data, the single derived PyG artifact, LaminDB state, and temporary
 candidates share `gs://jouvencekb` under disjoint prefixes. Only `raw/` and
-`main/` are canonical public data. `pyg/` is a durable, reproducible derived
-training layer. A prefix-scoped lifecycle applies exclusively to `staging/`,
-never to canonical data, PyG snapshots, or LaminDB state.
+`main/` are canonical public data. `pyg/` is a reproducible derived training
+layer. The bucket currently has no lifecycle rule; staging cleanup is explicit.
 
 ## Namespaces
 
 | Purpose | URI | Contract |
 |---|---|---|
 | Stable public data | `gs://jouvencekb/{raw,main}` | Durable, reviewed data |
-| Derived PyG snapshots | `gs://jouvencekb/pyg/<graph-build-id>` | Durable, immutable, reproducible from an exact `main/` snapshot; not canonical biology |
-| Temporary candidates | `gs://jouvencekb/staging` | Non-canonical; prefix-scoped lifecycle deletion after 14 days |
+| Current derived PyG build | `gs://jouvencekb/pyg` | One replaceable build, reproducible from exact `main/` generations; not canonical biology |
+| Temporary candidates | `gs://jouvencekb/staging` | Non-canonical; delete explicitly after promotion/readback |
 | LaminDB internals | `gs://jouvencekb/.lamin` | Hidden runtime/catalog state; not a public data layer |
 
 ## Stable layout
@@ -34,15 +33,14 @@ gs://jouvencekb/
 │   ├── features/<feature>.parquet
 │   └── embeddings/<entity>-<modality>-<model>.parquet
 └── pyg/
-    └── <graph-build-id>/
-        ├── manifest.json
-        ├── node_maps/
-        ├── adjacency/
-        ├── feature_indices/
-        │   ├── nodes/
-        │   ├── edges/
-        │   └── splits/
-        └── validation/
+    ├── manifest.json
+    ├── node_maps/
+    ├── adjacency/
+    ├── feature_indices/
+    │   ├── nodes/
+    │   ├── edges/
+    │   └── splits/
+    └── validation/
 
 gs://jouvencekb/
 └── staging/
@@ -67,7 +65,7 @@ Parquets.
 - `main/features/`: non-topological node/edge feature sidecars.
 - `main/embeddings/`: accepted learned vector tables, one flat Parquet object per
   entity/modality/model release.
-- `pyg/`: immutable derived training snapshots: node index maps, disk-backed CSC
+- `pyg/`: the current derived training build: node index maps, disk-backed CSC
   adjacency, aligned feature arrays/masks, split metadata, and validation
   reports. It is reproducible from exact `main/` generations and never replaces
   canonical Parquet.
@@ -87,11 +85,12 @@ Use:
 - canonical read root: `gs://jouvencekb/main`
 - raw source root: `gs://jouvencekb/raw`
 - candidate write root: `gs://jouvencekb/staging/<task-or-build-id>`
-- durable derived PyG root: `gs://jouvencekb/pyg/<graph-build-id>`
+- derived PyG root: `gs://jouvencekb/pyg`
 - LaminDB storage root: `gs://jouvencekb/.lamin`
 
-For FUSE, mount the bucket root and point code at `<mount>/main`; do not recreate
-a local `kg/v2` alias.
+For PyG training, do not mount the bucket. Copy `gs://jouvencekb/pyg/*` once to
+worker-local SSD with `gcloud storage cp --recursive`, verify the manifest, and
+open the local files with memory mapping.
 
 ## Publication protocol
 
@@ -103,13 +102,11 @@ a local `kg/v2` alias.
    or the reviewed current generation for an intentional replacement).
 4. Read back CRC32C, size, Parquet footer, row count, and schema.
 5. Refresh and check `docs/parquet-catalog/` against the live bucket.
-6. Delete or allow lifecycle deletion of the staging candidate only after the
-   canonical readback passes.
+6. Delete the staging candidate explicitly only after canonical readback passes.
 
-For PyG snapshots, build under `staging/<build-id>/pyg`, validate exact source
-generations, adjacency, feature alignment and split leakage, then publish
-marker-last to a new immutable `pyg/<graph-build-id>/`. PyG publication does not
-mutate `main/` and does not make the artifact canonical biological data.
+For PyG, build under `staging/<build-id>/pyg`, validate exact source generations,
+adjacency, feature alignment and split leakage, replace the current `pyg/`
+payload, then upload `manifest.json` last. There is only one PyG build for now.
 
 Never create `staged/`, `staging/`, `metadata/`, `proof/`, or `archive/` in the
 stable bucket or inside `main/`. Candidate bundles, checkpoints, and transient
@@ -131,6 +128,5 @@ The live machine-readable inventory and generated dataset pages live under
 where applicable. Promotion receipts and detailed migration manifests are Git
 artifacts, not a bucket namespace.
 
-Both buckets have a seven-day soft-delete policy as a short recovery guard. The
-staging bucket additionally deletes all live objects after 14 days; staging must
-never be treated as a durable archive.
+Live bucket readback on 2026-07-28 reported no lifecycle, soft-delete, or object
+versioning configuration. Clean `staging/` explicitly; it is not an archive.

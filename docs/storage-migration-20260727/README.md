@@ -1,6 +1,6 @@
 # Jouvence bucket migration — 2026-07-27
 
-Status at 2026-07-27 15:56 CEST: **copy/readback complete; legacy deletion pending independent review**.
+Status corrected 2026-07-28: **copy/readback complete; legacy roots deleted after explicit human rescope and final live readback**.
 
 ## Decision
 
@@ -23,10 +23,10 @@ gs://jouvencekb/
 GCS has no real directories. `edges_inferred/` and `evidence_inferred/` remain
 absent while they contain no accepted Parquet tables.
 
-Temporary candidates now belong under `gs://jouvencekb/staging`, covered by a
-prefix-scoped 14-day deletion lifecycle. LaminDB internals
-live under `gs://jouvencekb/.lamin`; they share the stable bucket's seven-day soft-delete guard
-but are explicitly excluded from the public data contract.
+Temporary candidates belong under `gs://jouvencekb/staging` and are cleaned
+explicitly. Live bucket readback on 2026-07-28 showed no lifecycle, soft-delete,
+or object-versioning configuration. LaminDB internals live under
+`gs://jouvencekb/.lamin` and are excluded from the public data contract.
 
 ## Frozen pre-migration evidence
 
@@ -145,9 +145,7 @@ their storage/exclusion metadata.
 
 The temporary staging bucket contained zero objects, so there was nothing to
 move. It was deleted. `gs://jouvencekb/staging/` is the only future staging
-namespace, with deletion after 14 days scoped by `matchesPrefix: ["staging/"]`.
-The bucket's seven-day soft-delete guard remains active, and the lifecycle does
-not match `raw/`, `main/`, or `.lamin/`.
+namespace and has explicit cleanup rather than an active lifecycle rule.
 
 ## Repository cutover and validation
 
@@ -183,5 +181,8 @@ Before deleting old prefixes:
    check again;
 6. stop `txgnn-worker` after final remote validation.
 
-Because the stable bucket has seven-day soft delete, the deletion remains
-recoverable during the immediate post-cutover window.
+On 2026-07-28 the operator revalidated the 110/110 live catalog, active
+`.lamin/` surface and stopped workers, then deleted `kg/`, `.lamindb/`, `lamin/`,
+`_clawd_probe.txt`, and the empty `gcloud/` folder marker. Because soft delete
+was not active, this cleanup is not recoverable through a bucket soft-delete
+window; the migration receipts remain the durable audit record.

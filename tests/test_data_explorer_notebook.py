@@ -127,6 +127,17 @@ def test_notebook_teaches_named_loading_graph_links_umap_gaps_and_pyg() -> None:
     assert "HeteroData" in text
     assert "umap-learn" in (ROOT / "pyproject.toml").read_text()
 
+    # The production path is implemented, not left as hypothetical prose.
+    assert "resolve_pyg_build" in text
+    assert "materialize_pyg_build" in text
+    assert "open_pyg_stores" in text
+    assert "make_neighbor_loader" in text
+    assert "make_link_neighbor_loader" in text
+    assert 'PYG_ROOT = "gs://jouvencekb/pyg"' in text
+    assert "gcloud storage cp" in text
+    assert "gcsfuse" not in text.lower()
+    assert "graph-build-id" not in text
+
 
 def test_local_listing_is_early_bounded(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch

@@ -34,7 +34,8 @@ This notebook is a **bounded, read-only GCS explorer and data-model tutorial**. 
 4. follow a `node → edge → node` path and an `edge → evidence` path;
 5. project a bounded embedding sample with UMAP (or a deterministic PCA fallback);
 6. distinguish staging objects from schema-declared nodes/relations that are not yet materialized in the KG;
-7. stream the complete KG into bounded PyTorch Geometric minibatches without a global export.
+7. stream the complete KG into bounded PyTorch Geometric minibatches without a global export;
+8. copy the single production PyG index from GCS to worker-local SSD and open real neighbor loaders.
 
 The canonical roots are `gs://jouvencekb/main/{nodes,edges,evidence,features,embeddings,...}`. Temporary candidates belong only under `gs://jouvencekb/staging/`. LaminDB runtime state under `.lamin/` is intentionally excluded.
 """),
@@ -537,7 +538,77 @@ features: it remains typed provenance for an assertion. A model can derive a
 reviewed evidence feature from these rows without losing the original records.
 """),
         md("""
-## 9. Regenerate and validate
+## 9. Open the production neighbor-sampling build
+
+Sequential edge minibatching is useful for inspection, transformation, and edge-wise models, but it is not a multi-hop GNN loader. The production build lives directly under `gs://jouvencekb/pyg/`; there is one current build, not a hierarchy of versions.
+
+GCS is used for transport. We do **not** mount the bucket and do not sample through remote object reads. At job startup, `materialize_pyg_build` runs the equivalent of:
+
+```bash
+gcloud storage cp --recursive 'gs://jouvencekb/pyg/*' /mnt/disks/pyg-cache/
+```
+
+It then verifies the manifest, sizes and SHA-256 checksums before opening adjacency and feature arrays with memory mapping.
+"""),
+        code("""
+from manage_db.pyg_artifact import (
+    PYG_ROOT,
+    make_link_neighbor_loader,
+    make_neighbor_loader,
+    materialize_pyg_build,
+    open_pyg_stores,
+    resolve_pyg_build,
+)
+
+PYG_ROOT = "gs://jouvencekb/pyg"
+PYG_CACHE_DIR = Path(os.environ.get("JOUVENCE_PYG_CACHE", "/mnt/disks/pyg-cache"))
+OPEN_PRODUCTION_PYG = os.environ.get("JOUVENCE_EXPLORER_OPEN_PYG") == "1"
+
+print("copy command:")
+print(f"gcloud storage cp --recursive '{PYG_ROOT}/*' {PYG_CACHE_DIR}/")
+
+if OPEN_PRODUCTION_PYG:
+    pyg_build = resolve_pyg_build(PYG_ROOT)
+    local_pyg_build = materialize_pyg_build(pyg_build, PYG_CACHE_DIR, verify=True)
+    graph_store, feature_store = open_pyg_stores(local_pyg_build, mmap=True)
+    print({
+        "local_root": str(local_pyg_build.root),
+        "edge_types": len(graph_store.get_all_edge_attrs()),
+        "feature_tensors": len(feature_store.get_all_tensor_attrs()),
+    })
+else:
+    print("Production PyG open skipped. Set JOUVENCE_EXPLORER_OPEN_PYG=1 on the training worker.")
+"""),
+        md("""
+### Create node- or link-seed loaders
+
+`NeighborLoader` starts from seed nodes. `LinkNeighborLoader` starts from supervised seed edges and is the default for Jouvence/TxGNN link prediction. The exact seed tensors and fanouts belong to the reviewed training split; validation/test labels and their reverse edges must be absent from message-passing adjacency.
+"""),
+        code("""
+if OPEN_PRODUCTION_PYG:
+    # Replace these examples with reviewed integer seed IDs from feature_indices/splits.
+    # node_loader = make_neighbor_loader(
+    #     graph_store=graph_store,
+    #     feature_store=feature_store,
+    #     input_nodes=("disease", train_disease_ids),
+    #     num_neighbors={edge_type: [15, 5] for edge_type in graph_store_edge_types},
+    #     batch_size=512,
+    #     shuffle=True,
+    # )
+    # link_loader = make_link_neighbor_loader(
+    #     graph_store=graph_store,
+    #     feature_store=feature_store,
+    #     edge_label_index=(("molecule", "molecule_treats_disease", "disease"), train_edges),
+    #     num_neighbors=reviewed_fanouts,
+    #     batch_size=512,
+    #     shuffle=True,
+    # )
+    print("Stores are open. Provide reviewed split seeds/fanouts to make_neighbor_loader or make_link_neighbor_loader.")
+else:
+    print("Loader construction skipped with the production build open step.")
+"""),
+        md("""
+## 10. Regenerate and validate
 
 ```bash
 uv run --group notebooks python scripts/build_data_explorer_notebook.py
@@ -545,7 +616,7 @@ JOUVENCE_BILLING_PROJECT='<your-project>' \
   uv run --group notebooks --group gnn python scripts/check_data_explorer_notebook.py --execute
 ```
 
-The committed notebook is deterministic and output-free. Live execution evidence belongs outside the committed `.ipynb`. Full epochs should run in-region. If training needs shuffled multi-hop neighborhoods rather than sequential edge batches, build a versioned disk-backed adjacency/GraphStore index; do not fall back to a monolithic `.pt`.
+The committed notebook is deterministic and output-free. Live execution evidence belongs outside the committed `.ipynb`. Full epochs and production PyG materialization should run in-region. The single disk-backed adjacency/GraphStore build is copied to local SSD; do not mount GCS and do not fall back to a monolithic `.pt`.
 """),
     ]
 

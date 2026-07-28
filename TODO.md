@@ -13,9 +13,8 @@ Do **not** use `.omoc` for new work. It is a legacy scratch/cache location from 
 - `docs/` for human-readable reports;
 - `gs://jouvencekb/staging/...` for remote staged artifacts;
 - canonical writes only under `gs://jouvencekb/main/...` after validation + review.
-- immutable derived neighbor-sampling artifacts under
-  `gs://jouvencekb/pyg/<graph-build-id>/` only after staged build, review and
-  marker-last publication.
+- the single current neighbor-sampling build under `gs://jouvencekb/pyg/` only
+  after staged build, review, direct-copy verification, and manifest-last publication.
 
 Heavy Jouvence jobs are VM-only. Any card that may run LaminDB full/bulk syncs, production/full PyG/GNN exports or training, embeddings/full-KG scans, all-relation reads, or bulk canonical KG reads/writes must state `must_run_on=txgnn-worker` (the retained VM name) or another explicitly approved in-region worker, use `gs://jouvencekb/main` as source, and forbid `/Users/jkobject/mnt/gcs/...` / macOS GCS-FUSE for heavy work. Required preflight: verify `hostname`, launch/inspect with `gcloud compute ssh txgnn-worker`, check for an existing related writer/process, and fail if any heavy input/output path starts with `/Users/jkobject/mnt/gcs`. Copyable card template: `artifacts/reports/t_d682b7ad/heavy_job_vm_only_card_template.md`. ReMap route C is complete and unsupervised; these generic VM rules do not authorize or resume ReMap work.
 

@@ -10,11 +10,11 @@ final GNN training loader.
 
 ## Durable derived namespace
 
-Canonical biological tables remain under `gs://jouvencekb/main`. Versioned PyG
-training artifacts live separately under:
+Canonical biological tables remain under `gs://jouvencekb/main`. The single current PyG
+training build lives directly under:
 
 ```text
-gs://jouvencekb/pyg/<graph-build-id>/
+gs://jouvencekb/pyg/
 ```
 
 This prefix is durable, derived, and replaceable. It is not subject to the
@@ -24,13 +24,12 @@ LaminDB may catalog these artifacts and their lineage, but LaminDB registration 
 secondary to the simple GCS artifact contract.
 
 Build candidates first under `gs://jouvencekb/staging/<build-id>/pyg/`, validate
-them, then publish one immutable snapshot under `pyg/<graph-build-id>/` using
-generation preconditions and marker-last semantics.
+them, replace the current payload under `pyg/`, then upload `manifest.json` last.
 
 Canonical build layout:
 
 ```text
-gs://jouvencekb/pyg/<graph-build-id>/
+gs://jouvencekb/pyg/
 ├── manifest.json
 ├── node_maps/
 ├── adjacency/
@@ -84,7 +83,7 @@ or re-sort the graph at every job start.
 
 ### Job startup
 
-1. Resolve an immutable `pyg/<graph-build-id>` manifest and verify that it matches
+1. Resolve `pyg/manifest.json` and verify that it matches
    the requested canonical snapshot.
 2. Copy/cache the artifact once from GCS to worker-local SSD and verify hashes.
 3. Open `JouvenceGraphStore` and `JouvenceFeatureStore` over memory-mapped arrays.
@@ -92,8 +91,8 @@ or re-sort the graph at every job start.
    relation-specific fanout policy.
 5. Move only each sampled minibatch to the accelerator.
 
-Do not neighbor-sample directly through random GCS/FUSE reads. Build and training
-remain in-region worker operations.
+Do not neighbor-sample through random GCS or FUSE reads. Copy the complete build
+with `gcloud storage cp --recursive`, then train from worker-local SSD.
 
 ### Split and leakage gate
 

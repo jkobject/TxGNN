@@ -14,7 +14,7 @@ Sequential Parquet edge minibatching is retained for exhaustive audits, derived
 artifact builds, and simple edge scorers. It is **not** the final multi-hop GNN
 training loader. The accepted production direction is:
 
-- immutable derived snapshots under `gs://jouvencekb/pyg/<graph-build-id>/`;
+- one current derived build under `gs://jouvencekb/pyg/`;
 - destination-sorted CSC adjacency plus technical reverse relations;
 - worker-local SSD cache and memory-mapped `GraphStore`/`FeatureStore`;
 - `NeighborLoader` for node-seed tasks and `LinkNeighborLoader` for Jouvence link
@@ -70,10 +70,10 @@ So the correct answer is: **yes for the sidecar/memmap sampled architecture and 
 
 ## Remaining work
 
-1. Build and independently review one versioned CSC neighbor-index snapshot on an
-   approved in-region worker; publish marker-last under `pyg/<graph-build-id>/`.
-2. Implement and test `JouvenceGraphStore`, `JouvenceFeatureStore`, local cache
-   verification, and ergonomic `NeighborLoader`/`LinkNeighborLoader` helpers.
+1. Build and independently review the CSC neighbor index on an approved in-region
+   worker; publish its payload under `pyg/` and `manifest.json` last.
+2. The store, direct-copy verification, and ergonomic loader helpers are now
+   implemented and shown in notebook 07; exercise them against the first build.
 3. Add exact train/validation/test and reverse-edge anti-leakage validation.
 4. Demonstrate a real heterogeneous two-hop sampled batch in notebook 07 without
    downloading or rebuilding the full artifact on the Mac.

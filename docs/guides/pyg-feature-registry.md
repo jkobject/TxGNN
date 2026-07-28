@@ -145,7 +145,7 @@ The intended GNN training path is:
 ```text
 canonical main/ snapshot
         ↓ reproducible build on an in-region worker
-versioned gs://jouvencekb/pyg/<graph-build-id>/ artifact
+single current gs://jouvencekb/pyg/ artifact
         ↓ stage/cache once per job
 worker-local SSD
         ↓ memory-map
@@ -158,15 +158,12 @@ bounded heterogeneous multi-hop minibatches
 
 `NeighborLoader` is for node-seed tasks. `LinkNeighborLoader` is the default for Jouvence/TxGNN link prediction. The message-passing graph must contain only training-visible edges; validation/test labels and their technical reverse edges must not be present in sampled adjacency.
 
-## Human-facing helper API to implement
+## Implemented human-facing helper API
 
-The final API should make the safe path short and hard to misuse:
+The API in `manage_db/pyg_artifact.py` makes the safe path short and explicit:
 
 ```python
-build = resolve_pyg_build(
-    "gs://jouvencekb/pyg/<graph-build-id>",
-    billing_project=...,
-)
+build = resolve_pyg_build("gs://jouvencekb/pyg")
 
 local_build = materialize_pyg_build(
     build,
@@ -208,7 +205,7 @@ Required helpers:
 - `audit_embedding_coverage(...)`: produce the disjoint coverage counts above;
 - `validate_no_split_leakage(...)`: prove held-out labels and reverse edges are absent from message-passing adjacency.
 
-Notebook 07 should demonstrate these helpers against a reviewed small snapshot, then show how the same API resolves a full snapshot on an approved in-region worker. It must not silently rebuild or download the complete artifact on the Mac.
+Notebook 07 imports and demonstrates the implemented resolve/materialize/open/loader helpers. Production materialization remains opt-in and worker-only until the first reviewed build is published.
 
 ## Review checklist for a registry change
 
