@@ -186,3 +186,43 @@ On 2026-07-28 the operator revalidated the 110/110 live catalog, active
 `_clawd_probe.txt`, and the empty `gcloud/` folder marker. Because soft delete
 was not active, this cleanup is not recoverable through a bucket soft-delete
 window; the migration receipts remain the durable audit record.
+
+## Why the bucket became much smaller
+
+The often-quoted `168,588,371,174` bytes was the size of the **whole bucket**
+before migration, not the size of `kg/` alone. The old `kg/` tree accounted for
+`146,429,257,416` bytes. The preserved inventory gives this disjoint accounting:
+
+| Pre-migration content | Objects | Bytes | Outcome |
+|---|---:|---:|---|
+| `kg/v2/staging/` intermediate shards | 10,867 | 54,136,984,181 | deleted |
+| `kg/staging/` candidates/build inputs not selected for migration | 3,492 | 31,565,037,368 | deleted |
+| `kg/local-archive/` snapshots and tarballs not selected for migration | 617 | 23,291,835,571 | deleted |
+| selected source objects migrated to `main/` or `raw/` | 147 | 22,292,237,782 | copied/compacted and retained |
+| old LaminDB roots and probe outside `kg/` | 70 | 22,159,113,758 | active Lamin state retained under `.lamin/`; old duplicates removed |
+| `kg/scratch/` working copies | 81 | 10,266,218,195 | deleted |
+| other non-selected `kg/v2/` legacy content | 262 | 4,778,330,397 | deleted |
+| other `kg/` content | 2 | 98,613,922 | deleted |
+
+The 147 selected source objects occupied `22,292,237,782` bytes. Direct copies
+plus two verified compactions produced exactly `20,031,525,567` bytes under the
+new `main/` and `raw/` roots. Compaction therefore saved `2,260,712,215` bytes
+without dropping rows. The two compacted datasets were the 24 chromosome-level
+ReMap CRM support shards and the two protein-sequence embedding parts.
+
+The largest deleted material was not unique canonical biology:
+
+- `53,329,118,697` bytes of temporary ReMap bucket/shard output under one
+  `kg/v2/staging/remap-tf-binds-enhancer-...` run;
+- old build inputs including `protein.tar` (`3,900,416,000` bytes), `text.tar`
+  (`1,949,265,920` bytes), and `transcript.tar` (`575,559,680` bytes);
+- local machine/VM snapshots and tar archives, including an `8,044,615,141`-byte
+  literature archive and a `2,452,339,923`-byte variants scratch archive;
+- repeated enhancer node/edge/evidence Parquets across canonical, migration,
+  scratch, staging, and Lamin artifact locations.
+
+Thus the size drop is primarily removal of temporary shards, archived machine
+copies, scratch mirrors, and duplicate generations. It is not evidence that
+the selected canonical tables lost rows: the migration map records CRC32C
+readback for direct copies and row-count plus SHA-256 verification for both
+compactions.

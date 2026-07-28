@@ -146,8 +146,8 @@ The intended GNN training path is:
 canonical main/ snapshot
         ↓ reproducible build on an in-region worker
 single current gs://jouvencekb/pyg/ artifact
-        ↓ stage/cache once per job
-worker-local SSD
+        ↓ copy/cache once per job
+user-selected local directory (default: REPO/data/pyg/)
         ↓ memory-map
 JouvenceGraphStore + JouvenceFeatureStore
         ↓
@@ -167,7 +167,7 @@ build = resolve_pyg_build("gs://jouvencekb/pyg")
 
 local_build = materialize_pyg_build(
     build,
-    cache_dir="/mnt/disks/pyg-cache",
+    cache_dir="/path/chosen/by/the/user",  # default: REPO/data/pyg/
     verify=True,
 )
 
@@ -197,7 +197,7 @@ Required helpers:
 
 - `build_pyg_index(...)`: heavy, VM-only, deterministic CSC/reverse-index builder;
 - `resolve_pyg_build(...)`: validate build identity and canonical source generations;
-- `materialize_pyg_build(...)`: copy once to local SSD, verify hashes, reuse safely;
+- `materialize_pyg_build(...)`: copy once to a user-selected local directory, verify hashes, reuse safely;
 - `open_pyg_stores(...)`: return memory-mapped PyG `GraphStore` and `FeatureStore` implementations;
 - `make_neighbor_loader(...)`: node-task wrapper;
 - `make_link_neighbor_loader(...)`: link-task wrapper with split/leakage gates;

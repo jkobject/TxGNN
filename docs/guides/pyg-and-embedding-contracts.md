@@ -85,14 +85,15 @@ or re-sort the graph at every job start.
 
 1. Resolve `pyg/manifest.json` and verify that it matches
    the requested canonical snapshot.
-2. Copy/cache the artifact once from GCS to worker-local SSD and verify hashes.
+2. Copy/cache the artifact once from GCS to a user-selected local directory
+   (default: `REPO/data/pyg/`) and verify hashes.
 3. Open `JouvenceGraphStore` and `JouvenceFeatureStore` over memory-mapped arrays.
 4. Construct `LinkNeighborLoader` or `NeighborLoader` with a reviewed,
    relation-specific fanout policy.
 5. Move only each sampled minibatch to the accelerator.
 
 Do not neighbor-sample through random GCS or FUSE reads. Copy the complete build
-with `gcloud storage cp --recursive`, then train from worker-local SSD.
+with `gcloud storage cp --recursive`, then train from that local directory.
 
 ### Split and leakage gate
 

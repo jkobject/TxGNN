@@ -8,6 +8,7 @@ import numpy as np
 import pytest
 
 from manage_db.pyg_artifact import (
+    DEFAULT_PYG_CACHE,
     make_link_neighbor_loader,
     make_neighbor_loader,
     PygBuild,
@@ -15,6 +16,13 @@ from manage_db.pyg_artifact import (
     open_pyg_stores,
     resolve_pyg_build,
 )
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_default_cache_is_repo_local_and_ignored() -> None:
+    assert DEFAULT_PYG_CACHE == ROOT / "data" / "pyg"
+    assert "/data/pyg/" in (ROOT / ".gitignore").read_text()
 
 
 def _write_manifest(root: Path) -> Path:

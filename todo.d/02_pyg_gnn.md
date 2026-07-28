@@ -16,7 +16,8 @@ training loader. The accepted production direction is:
 
 - one current derived build under `gs://jouvencekb/pyg/`;
 - destination-sorted CSC adjacency plus technical reverse relations;
-- worker-local SSD cache and memory-mapped `GraphStore`/`FeatureStore`;
+- user-selected local cache (default: `REPO/data/pyg/`) and memory-mapped
+  `GraphStore`/`FeatureStore`;
 - `NeighborLoader` for node-seed tasks and `LinkNeighborLoader` for Jouvence link
   prediction;
 - split-aware adjacency that excludes validation/test labels and their reverse

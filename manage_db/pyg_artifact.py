@@ -1,8 +1,9 @@
 """Materialize and open the single Jouvence PyG build without GCS-FUSE.
 
 Canonical Parquet remains under ``gs://jouvencekb/main``. The derived sampling
-artifact lives directly under ``gs://jouvencekb/pyg`` and is copied once to
-worker-local SSD with ``gcloud storage cp`` before memory-mapped access.
+artifact lives directly under ``gs://jouvencekb/pyg`` and is copied once to a
+user-selected local directory with ``gcloud storage cp`` before memory-mapped
+access. The default is the repository-local ignored directory ``data/pyg``.
 """
 
 from __future__ import annotations
@@ -19,6 +20,8 @@ from typing import Any, Callable
 import numpy as np
 
 PYG_ROOT = "gs://jouvencekb/pyg"
+REPO_ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_PYG_CACHE = REPO_ROOT / "data" / "pyg"
 
 
 @dataclass(frozen=True)
@@ -97,12 +100,12 @@ def verify_pyg_build(build: LocalPygBuild) -> None:
 
 def materialize_pyg_build(
     build: PygBuild,
-    cache_dir: str | Path,
+    cache_dir: str | Path = DEFAULT_PYG_CACHE,
     *,
     verify: bool = True,
     runner: CommandRunner = _default_runner,
 ) -> LocalPygBuild:
-    """Copy the complete build to local SSD and optionally verify every file."""
+    """Copy the complete build locally and optionally verify every file."""
 
     target = Path(cache_dir).expanduser().resolve()
     target.mkdir(parents=True, exist_ok=True)

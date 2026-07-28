@@ -89,8 +89,9 @@ Use:
 - LaminDB storage root: `gs://jouvencekb/.lamin`
 
 For PyG training, do not mount the bucket. Copy `gs://jouvencekb/pyg/*` once to
-worker-local SSD with `gcloud storage cp --recursive`, verify the manifest, and
-open the local files with memory mapping.
+a user-selected local directory (default: `REPO/data/pyg/`) with
+`gcloud storage cp --recursive`, verify the manifest, and open the local files
+with memory mapping.
 
 ## Publication protocol
 

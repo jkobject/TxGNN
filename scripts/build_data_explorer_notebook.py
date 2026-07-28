@@ -35,7 +35,7 @@ This notebook is a **bounded, read-only GCS explorer and data-model tutorial**. 
 5. project a bounded embedding sample with UMAP (or a deterministic PCA fallback);
 6. distinguish staging objects from schema-declared nodes/relations that are not yet materialized in the KG;
 7. stream the complete KG into bounded PyTorch Geometric minibatches without a global export;
-8. copy the single production PyG index from GCS to worker-local SSD and open real neighbor loaders.
+8. copy the single production PyG index from GCS to a user-selected local directory and open real neighbor loaders.
 
 The canonical roots are `gs://jouvencekb/main/{nodes,edges,evidence,features,embeddings,...}`. Temporary candidates belong only under `gs://jouvencekb/staging/`. LaminDB runtime state under `.lamin/` is intentionally excluded.
 """),
@@ -545,7 +545,7 @@ Sequential edge minibatching is useful for inspection, transformation, and edge-
 GCS is used for transport. We do **not** mount the bucket and do not sample through remote object reads. At job startup, `materialize_pyg_build` runs the equivalent of:
 
 ```bash
-gcloud storage cp --recursive 'gs://jouvencekb/pyg/*' /mnt/disks/pyg-cache/
+gcloud storage cp --recursive 'gs://jouvencekb/pyg/*' ./data/pyg/
 ```
 
 It then verifies the manifest, sizes and SHA-256 checksums before opening adjacency and feature arrays with memory mapping.
@@ -561,7 +561,7 @@ from manage_db.pyg_artifact import (
 )
 
 PYG_ROOT = "gs://jouvencekb/pyg"
-PYG_CACHE_DIR = Path(os.environ.get("JOUVENCE_PYG_CACHE", "/mnt/disks/pyg-cache"))
+PYG_CACHE_DIR = Path(os.environ.get("JOUVENCE_PYG_CACHE", REPO_ROOT / "data" / "pyg"))
 OPEN_PRODUCTION_PYG = os.environ.get("JOUVENCE_EXPLORER_OPEN_PYG") == "1"
 
 print("copy command:")
@@ -616,7 +616,7 @@ JOUVENCE_BILLING_PROJECT='<your-project>' \
   uv run --group notebooks --group gnn python scripts/check_data_explorer_notebook.py --execute
 ```
 
-The committed notebook is deterministic and output-free. Live execution evidence belongs outside the committed `.ipynb`. Full epochs and production PyG materialization should run in-region. The single disk-backed adjacency/GraphStore build is copied to local SSD; do not mount GCS and do not fall back to a monolithic `.pt`.
+The committed notebook is deterministic and output-free. Live execution evidence belongs outside the committed `.ipynb`. Full epochs and production PyG materialization should run in-region. The single disk-backed adjacency/GraphStore build is copied to a user-selected local directory (default: `REPO/data/pyg/`); do not mount GCS and do not fall back to a monolithic `.pt`.
 """),
     ]
 
