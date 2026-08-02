@@ -1,4 +1,4 @@
-"""Generate and validate one deterministic reproduction notebook per canonical Parquet."""
+"""Generate and validate deterministic reproduction notebooks by production family."""
 
 from __future__ import annotations
 
@@ -14,10 +14,14 @@ import nbformat
 
 from reproduce.build_parquet_reproduction_registry import (
     CATALOG_PATH,
+    FAMILY_NOTEBOOKS,
     REGISTRY_PATH,
     ROOT,
     STATUSES,
     build_registry,
+    command_for,
+    family_for,
+    producer_for,
 )
 
 OUTPUT_DIR = ROOT / "notebooks/reproduce"
@@ -63,7 +67,31 @@ def _receipt(record: dict[str, Any]) -> str:
     )
 
 
-def build_notebook(record: dict[str, Any]) -> nbformat.NotebookNode:
+def family_records(registry: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    for record in registry["records"]:
+        grouped.setdefault(record["reproduce_notebook"], []).append(record)
+    return {
+        path: sorted(records, key=lambda row: (row["layer"], row["name"]))
+        for path, records in sorted(grouped.items())
+    }
+
+
+def _output_table(records: list[dict[str, Any]]) -> str:
+    rows = [
+        "| Layer | Canonical output | Rows | Replay level | Catalog |",
+        "|---|---|---:|---|---|",
+    ]
+    for record in records:
+        dataset_id = f"{record['layer']}__{record['name']}"
+        rows.append(
+            f"| `{record['layer']}` | `{record['name']}` | {record['qc']['rows']:,} | "
+            f"`{record['replay_level']}` | [catalog](../../{record['catalog_page']}) |"
+        )
+    return "\n".join(rows)
+
+
+def _output_details(record: dict[str, Any]) -> str:
     dataset_id = f"{record['layer']}__{record['name']}"
     qc = record["qc"]
     command = record["full_worker_rebuild_command"]
@@ -72,115 +100,157 @@ def build_notebook(record: dict[str, Any]) -> nbformat.NotebookNode:
         if command
         else "No verified exact full rebuild command is available. The lineage registry deliberately leaves this gap explicit rather than synthesizing an argv."
     )
-    intro = f"""# Reproduce `{dataset_id}`
+    return f"""### Output `{dataset_id}`
 
-{GENERATED_MARKER}
-
-## Objective and meaning
-
-Document and safely verify the exact current canonical Parquet `{record['canonical_uri']}`.
-
-**Meaning:** {record['meaning']}
-
-**Does not mean:** {record['non_meaning']}
-
-- Catalog: [`{record['catalog_page']}`](../../{record['catalog_page']})
 - Canonical URI: `{record['canonical_uri']}`
-- Reproducibility status: **`{record['reproducibility_status']}`**
-- Source family: **{record['source_family_label']}** (`{record['source_family']}`)
-"""
-    lineage = f"""## Native inputs, release, acquisition and environment
+- Catalog: [`{record['catalog_page']}`](../../{record['catalog_page']})
+- Replay level: **`{record['replay_level']}`**
+- Meaning: {record['meaning']}
+- Does not mean: {record['non_meaning']}
 
-**Release/version:** {record['release']}
+**Native inputs and release.** {record['release']}
 
-**Known retained raw objects or source endpoints**
+{_bullet(record['native_source'], empty='No selected native input is retained or resolvable from current evidence.')}
 
-{_bullet(record['native_inputs'], empty='No selected native input is retained or resolvable from current evidence.')}
+**Acquisition/preconditions.** {record['acquisition_and_preconditions']}
 
-**Preconditions:** {record['acquisition_and_preconditions']}
-
-## Expected schema and identifiers
-
-- Expected rows: **{qc['rows']:,}**
-- Expected bytes: **{qc['bytes']:,}**
-- Expected row groups: **{qc['row_groups']}**
-- Schema hash (`{qc['schema_hash_version']}`): `{qc['schema_hash']}`
-- Object generation: `{qc['generation']}`
-- CRC32C (base64): `{qc['crc32c_base64']}`
+**Expected schema and identifiers.** Rows: **{qc['rows']:,}**; bytes: **{qc['bytes']:,}**; row groups: **{qc['row_groups']}**; schema hash (`{qc['schema_hash_version']}`): `{qc['schema_hash']}`; generation: `{qc['generation']}`; CRC32C: `{qc['crc32c_base64']}`.
 
 {_fields_table(record['fields'])}
 
-## Keys, mappings and joins
+**Keys, mappings and joins.**
 
 {_keys(record)}
 
 {record['mappings_and_joins']}
 
-## Cleaning, normalization, transformations and filters
+**Cleaning, normalization, transformations and filters.** {record['transformations_and_filters']}
 
-{record['transformations_and_filters']}
+**Deduplication and assertion/evidence semantics.** {record['deduplication_and_evidence']}
 
-## Deduplication and assertion/evidence semantics
+**Quarantines, exclusions and missing data.** {record['quarantines_exclusions_missing']}
 
-{record['deduplication_and_evidence']}
+**Problems encountered and decisions.** {record['problems_and_decisions']}
 
-## Quarantines, exclusions and missing data
+Known gaps: {', '.join(f'`{value}`' for value in record['known_gaps']) or 'none declared'}.
 
-{record['quarantines_exclusions_missing']}
+**Producer / builder.** `{record['producer'] or 'not available as a current tracked builder'}`.
 
-## Problems encountered and decisions
-
-{record['problems_and_decisions']}
-
-Provenance fields still missing for this record: {', '.join(f'`{value}`' for value in record['provenance_gaps']) or 'none declared'}.
-
-## Producer / builder
-
-Tracked producer: `{record['producer_builder'] or 'not available as a current tracked builder'}`.
-
-## Full worker rebuild command (inert text; never executed by this notebook)
+**Full worker rebuild command (inert; never executed here).**
 
 {command_text}
 
-## Migration receipt
+**Migration receipt and QC.**
 
 {_receipt(record)}
 
-## QC, bounded replay and verification
+**Safe bounded replay.** {record['safe_bounded_replay']}
 
-{record['safe_bounded_replay']}
+**Reproducibility limits.** {record['reproducibility_limits']}
 
-The first code cell below performs an offline contract check only. The second is opt-in and reads GCS object metadata plus the Parquet footer only; it requires caller-owned ADC and `JOUVENCE_BILLING_PROJECT`. Neither cell writes data.
-
-## Reproducibility limits
-
-{record['reproducibility_limits']}
-
-## Linked code, tests, reports and historical notebooks
+**Linked code, tests, reports and historical notebooks.**
 
 {_bullet(record['links'], empty='No additional tracked links.')}
 """
-    embedded = json.dumps(record, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+
+
+def build_family_notebook(records: list[dict[str, Any]]) -> nbformat.NotebookNode:
+    if not records:
+        raise ValueError("cannot build an empty family notebook")
+    family_ids = {record["pipeline_family"] for record in records}
+    notebook_paths = {record["reproduce_notebook"] for record in records}
+    if len(family_ids) != 1 or len(notebook_paths) != 1:
+        raise ValueError("family notebook records must have one family and one primary path")
+    family_id = records[0]["pipeline_family"]
+    family_label = records[0]["source_family_label"]
+    intro = f"""# Reproduce {family_label}
+
+{GENERATED_MARKER}
+
+## Objective and meaning
+
+Document the coherent `{family_id}` acquisition/build/mapping pipeline and safely verify all {len(records)} current canonical Parquets assigned to it.
+
+Grouping justification: these outputs share a defensible source/transformation family context. Exact producer and command evidence remains per output and may be absent; layer alone is not used as a grouping rule, and differences remain explicit in each output contract.
+
+## Canonical outputs owned by this notebook
+
+{_output_table(records)}
+"""
+    guide = """## Native inputs, release, acquisition and environment
+
+Shared acquisition context is stated once; release and retained input differences are restated under every owned output.
+
+## Expected schema and identifiers
+
+Each output section carries its exact catalog schema, row count, object generation and checksum.
+
+## Keys, mappings and joins
+
+Shared family mappings are applied only where stated; every output preserves its own key contract.
+
+## Cleaning, normalization, transformations and filters
+
+Transformation and filter differences are explicit per output below.
+
+## Deduplication and assertion/evidence semantics
+
+Canonical edges are deduplicated assertions; source-specific multiplicity and context remain evidence/features where applicable.
+
+## Quarantines, exclusions and missing data
+
+Every output contract states its known exclusions and unresolved provenance.
+
+## Problems encountered and decisions
+
+Known decisions and alternatives are reported conservatively; migration identity is not treated as proof of biological replayability.
+
+## Producer / builder
+
+The per-output contracts name an evidenced tracked producer or state that it is unavailable.
+
+## Full worker rebuild command (inert text; never executed by this notebook)
+
+Any command below is documentation only and remains approved-worker, staging and review gated.
+
+## Migration receipt
+
+Every output includes its generation-matched, verified migration receipt.
+
+## QC, bounded replay and verification
+
+The first code cell validates all embedded output contracts offline. The opt-in cell verifies one selected GCS object metadata record and Parquet footer, chosen with `JOUVENCE_OUTPUT_ID`; it never scans all family outputs.
+
+## Reproducibility limits
+
+Replay levels remain per output. No family-level label upgrades weaker members.
+
+## Linked code, tests, reports and historical notebooks
+
+Links are listed in each output contract.
+"""
+    details = "## Per-output reproduction contracts\n\n" + "\n\n".join(_output_details(record) for record in records)
+    embedded = json.dumps(records, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
     offline_code = f'''import hashlib
 import json
 
-RECORD = json.loads(r\'''{embedded}\''')
+RECORDS = json.loads(r\'''{embedded}\''')
 
 def require(condition, message):
     if not condition:
         raise RuntimeError(message)
 
-require(RECORD["canonical_uri"] == "gs://jouvencekb/main/" + ("embeddings" if RECORD["layer"] == "embedding" else RECORD["layer"]) + "/" + RECORD["name"] + ".parquet", "canonical URI/identity mismatch")
-require(RECORD["reproducibility_status"] in {sorted(STATUSES)!r}, "unsupported reproducibility status")
-require(RECORD["qc"]["rows"] >= 0, "negative expected row count")
-require(len(RECORD["qc"]["schema_hash"]) == 64, "invalid schema hash")
-require(RECORD["migration_receipt"]["verified"] is True, "migration receipt is not verified")
-require(bool(RECORD["fields"]), "empty expected schema")
+for RECORD in RECORDS:
+    require(RECORD["canonical_uri"] == "gs://jouvencekb/main/" + ("embeddings" if RECORD["layer"] == "embedding" else RECORD["layer"]) + "/" + RECORD["name"] + ".parquet", "canonical URI/identity mismatch")
+    require(RECORD["replay_level"] in {sorted(STATUSES)!r}, "unsupported replay level")
+    require(RECORD["qc"]["rows"] >= 0, "negative expected row count")
+    require(len(RECORD["qc"]["schema_hash"]) == 64, "invalid schema hash")
+    require(RECORD["migration_receipt"]["verified"] is True, "migration receipt is not verified")
+    require(bool(RECORD["fields"]), "empty expected schema")
 summary = {{
-    "identity": RECORD["layer"] + "__" + RECORD["name"],
-    "rows": RECORD["qc"]["rows"],
-    "status": RECORD["reproducibility_status"],
-    "schema_hash": RECORD["qc"]["schema_hash"],
+    "pipeline_family": RECORDS[0]["pipeline_family"],
+    "output_count": len(RECORDS),
+    "identities": [record["layer"] + "__" + record["name"] for record in RECORDS],
 }}
 summary
 '''
@@ -198,6 +268,11 @@ else:
     fs = gcsfs.GCSFileSystem(project=billing_project, requester_pays=billing_project, version_aware=True)
     if not fs.version_aware:
         raise RuntimeError("version-aware GCS reads are required")
+    selected_id = os.environ.get("JOUVENCE_OUTPUT_ID", RECORDS[0]["layer"] + "__" + RECORDS[0]["name"])
+    selected = [record for record in RECORDS if record["layer"] + "__" + record["name"] == selected_id]
+    if len(selected) != 1:
+        raise RuntimeError("JOUVENCE_OUTPUT_ID must select exactly one output owned by this notebook")
+    RECORD = selected[0]
     object_path = RECORD["canonical_uri"].removeprefix("gs://")
     if "#" in object_path:
         raise RuntimeError("canonical object key must not already contain a generation suffix")
@@ -226,7 +301,8 @@ live_result
     notebook = nbformat.v4.new_notebook(
         cells=[
             nbformat.v4.new_markdown_cell(intro),
-            nbformat.v4.new_markdown_cell(lineage),
+            nbformat.v4.new_markdown_cell(guide),
+            nbformat.v4.new_markdown_cell(details),
             nbformat.v4.new_markdown_cell("## Offline bounded contract check\n\nThis cell uses only the embedded frozen lineage record."),
             nbformat.v4.new_code_cell(offline_code),
             nbformat.v4.new_markdown_cell("## Optional bounded live canonical footer check\n\nThis cell is skipped unless the caller explicitly opts in."),
@@ -247,13 +323,14 @@ live_result
 
 def build_readme(registry: dict[str, Any]) -> str:
     records = registry["records"]
+    grouped = family_records(registry)
     counts = Counter(row["reproducibility_status"] for row in records)
     lines = [
-        "# Exact canonical Parquet reproduction notebooks",
+        "# Canonical Parquet reproduction notebooks by production family",
         "",
         GENERATED_MARKER,
         "",
-        "This directory has exactly one generated, read-only-by-default notebook for every current canonical Parquet in `gs://jouvencekb/main`. The exact denominator and identity spelling come from `docs/parquet-catalog/inventory.json`; `embedding` is intentionally singular here because that is the catalog layer identity even though its GCS prefix is `embeddings/`.",
+        f"This directory has {len(grouped)} generated, read-only-by-default production-family notebooks covering every current canonical Parquet in `gs://jouvencekb/main`. The exact 110-row denominator and identity spelling come from `docs/parquet-catalog/inventory.json`; each Parquet has exactly one primary notebook in `reproduce/parquet_reproduction_lineage.json`.",
         "",
         "These notebooks preserve and link the broader historical `reproduce/*.ipynb` source-family notebooks. A family notebook or byte-preserving migration receipt is not, by itself, proof that the original biological build is fully replayable.",
         "",
@@ -273,15 +350,30 @@ def build_readme(registry: dict[str, Any]) -> str:
         "- Regenerate: `uv run python reproduce/build_parquet_reproduction_registry.py && uv run python reproduce/generate_parquet_reproduction_notebooks.py`.",
         "- Check: `uv run python reproduce/generate_parquet_reproduction_notebooks.py --check`.",
         "",
-        "## Notebook index",
+        "## Grouping justification",
         "",
-        "| Layer | Dataset | Source family | Status | Rows | Notebook | Catalog |",
+        "Families are based on a defensible source/transformation context, not superficial storage layer. Exact producer and command evidence remains per output and may be absent. Every notebook includes a visible owned-output table and a dedicated output contract for differences in schemas, keys, transformations, exclusions, QC, commands and gaps.",
+        "",
+        "| Pipeline family | Notebook | Parquets | Layers |",
+        "|---|---|---:|---|",
+    ])
+    for path, family_rows in grouped.items():
+        family = family_rows[0]["pipeline_family"]
+        filename = Path(path).name
+        layers = ", ".join(sorted({row["layer"] for row in family_rows}))
+        lines.append(f"| `{family}` | [{filename}]({filename}) | {len(family_rows)} | {layers} |")
+    lines.extend([
+        "",
+        "## Exact 110-output coverage matrix",
+        "",
+        "| Layer | Dataset | Pipeline family | Status | Rows | Primary notebook | Catalog |",
         "|---|---|---|---|---:|---|---|",
     ])
     for row in records:
         dataset_id = f"{row['layer']}__{row['name']}"
+        filename = Path(row["reproduce_notebook"]).name
         lines.append(
-            f"| `{row['layer']}` | `{row['name']}` | {row['source_family_label']} | `{row['reproducibility_status']}` | {row['qc']['rows']:,} | [{dataset_id}.ipynb]({dataset_id}.ipynb) | [catalog](../../{row['catalog_page']}) |"
+            f"| `{row['layer']}` | `{row['name']}` | `{row['pipeline_family']}` | `{row['replay_level']}` | {row['qc']['rows']:,} | [{filename}]({filename}) | [catalog](../../{row['catalog_page']}) |"
         )
     return "\n".join(lines) + "\n"
 
@@ -296,7 +388,38 @@ def validate_registry(registry: dict[str, Any]) -> None:
         raise SystemExit(f"registry/catalog mismatch: missing={sorted(expected - set(actual))}, stale={sorted(set(actual) - expected)}")
     if registry["record_count"] != len(actual) or len(actual) != catalog["dataset_count"]:
         raise SystemExit("registry count does not equal catalog denominator")
+    grouped = family_records(registry)
+    if not 1 <= len(grouped) <= 20:
+        raise SystemExit(f"family notebook count outside 1..20: {len(grouped)}")
+    for path, rows in grouped.items():
+        if len({row["pipeline_family"] for row in rows}) != 1:
+            raise SystemExit(f"multiple pipeline families share primary notebook: {path}")
     for row in registry["records"]:
+        required_coverage = (
+            row.get("canonical_uri"), row.get("layer"), row.get("name"),
+            row.get("reproduce_notebook"), row.get("pipeline_family"),
+        )
+        if not all(required_coverage):
+            raise SystemExit(f"incomplete primary coverage row: {row.get('layer')}__{row.get('name')}")
+        expected_family = family_for(row["layer"], row["name"])
+        if row["pipeline_family"] != expected_family or row["source_family"] != expected_family:
+            raise SystemExit(f"authoritative pipeline family mismatch: {row['layer']}__{row['name']}")
+        expected_notebook = f"notebooks/reproduce/{FAMILY_NOTEBOOKS[expected_family]}"
+        if row["reproduce_notebook"] != expected_notebook:
+            raise SystemExit(f"authoritative primary notebook mismatch: {row['layer']}__{row['name']}")
+        dataset_id = f"{row['layer']}__{row['name']}"
+        if row["producer"] != producer_for(dataset_id, expected_family):
+            raise SystemExit(f"authoritative producer mismatch: {dataset_id}")
+        if row["full_worker_rebuild_command"] != command_for(dataset_id, expected_family):
+            raise SystemExit(f"authoritative rebuild command mismatch: {dataset_id}")
+        if row["rebuild_command_evidenced"] is not (row["full_worker_rebuild_command"] is not None):
+            raise SystemExit(f"rebuild command evidence flag mismatch: {dataset_id}")
+        if row["producer"] != row["producer_builder"] or row["native_source"] != row["native_inputs"]:
+            raise SystemExit(f"coverage lineage aliases disagree: {row['layer']}__{row['name']}")
+        if row["replay_level"] != row["reproducibility_status"] or row["known_gaps"] != row["provenance_gaps"]:
+            raise SystemExit(f"coverage replay aliases disagree: {row['layer']}__{row['name']}")
+        if not row["reproduce_notebook"].startswith("notebooks/reproduce/") or not row["reproduce_notebook"].endswith(".ipynb"):
+            raise SystemExit(f"invalid primary notebook path: {row['reproduce_notebook']}")
         if row["reproducibility_status"] not in STATUSES:
             raise SystemExit(f"invalid status: {row['reproducibility_status']}")
         if row["reproducibility_status"] == "fully-replayable":
@@ -313,9 +436,8 @@ def validate_registry(registry: dict[str, Any]) -> None:
 
 def expected_files(registry: dict[str, Any]) -> dict[Path, str]:
     files = {README_PATH: build_readme(registry)}
-    for row in registry["records"]:
-        path = ROOT / row["notebook"]
-        files[path] = nbformat.writes(build_notebook(row))
+    for relative_path, records in family_records(registry).items():
+        files[ROOT / relative_path] = nbformat.writes(build_family_notebook(records))
     return files
 
 

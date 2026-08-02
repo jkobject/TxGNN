@@ -3,14 +3,21 @@ from __future__ import annotations
 import json
 import re
 import subprocess
+from copy import deepcopy
 from collections import Counter
 from pathlib import Path
 
 import nbformat
+import pytest
 from nbclient import NotebookClient
 
 from reproduce.build_parquet_reproduction_registry import STATUSES, build_registry
-from reproduce.generate_parquet_reproduction_notebooks import build_notebook, build_readme, validate_registry
+from reproduce.generate_parquet_reproduction_notebooks import (
+    build_family_notebook,
+    build_readme,
+    family_records,
+    validate_registry,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 CATALOG_PATH = ROOT / "docs/parquet-catalog/inventory.json"
@@ -19,7 +26,12 @@ NOTEBOOK_DIR = ROOT / "notebooks/reproduce"
 REQUIRED_RECORD_FIELDS = {
     "layer",
     "name",
-    "notebook",
+    "reproduce_notebook",
+    "pipeline_family",
+    "producer",
+    "native_source",
+    "replay_level",
+    "known_gaps",
     "catalog_page",
     "canonical_uri",
     "meaning",
@@ -67,6 +79,99 @@ def test_registry_is_exact_deterministic_catalog_denominator() -> None:
     assert len(actual) == len(set(actual)) == 110
     assert set(actual) == expected
     assert payload["record_count"] == catalog["dataset_count"] == 110
+
+
+def test_every_parquet_has_one_primary_family_notebook_with_a_defensible_group() -> None:
+    payload = registry()
+    grouped = family_records(payload)
+    notebook_paths = [row["reproduce_notebook"] for row in payload["records"]]
+    assert 1 <= len(grouped) <= 20
+    assert len(grouped) == 17
+    assert set(grouped) == set(notebook_paths)
+    assert all(path.startswith("notebooks/reproduce/") and path.endswith(".ipynb") for path in grouped)
+    assert all(rows and len({row["pipeline_family"] for row in rows}) == 1 for rows in grouped.values())
+    assert all(len({row["reproduce_notebook"] for row in rows}) == 1 for rows in grouped.values())
+
+
+def test_validator_rejects_missing_duplicate_stale_ambiguous_and_over_cap_coverage() -> None:
+    payload = registry()
+
+    missing = deepcopy(payload)
+    missing["records"].pop()
+    with pytest.raises(SystemExit, match="registry/catalog mismatch"):
+        validate_registry(missing)
+
+    duplicate = deepcopy(payload)
+    duplicate["records"].append(deepcopy(duplicate["records"][0]))
+    with pytest.raises(SystemExit, match="duplicate lineage registry identities"):
+        validate_registry(duplicate)
+
+    stale = deepcopy(payload)
+    stale["records"][0]["name"] = "stale_legacy_identity"
+    with pytest.raises(SystemExit, match="registry/catalog mismatch"):
+        validate_registry(stale)
+
+    ambiguous = deepcopy(payload)
+    first = ambiguous["records"][0]
+    second = next(row for row in ambiguous["records"] if row["pipeline_family"] != first["pipeline_family"])
+    second["reproduce_notebook"] = first["reproduce_notebook"]
+    with pytest.raises(SystemExit, match="multiple pipeline families share primary notebook"):
+        validate_registry(ambiguous)
+
+    over_cap = deepcopy(payload)
+    for index, row in enumerate(over_cap["records"][:21]):
+        row["reproduce_notebook"] = f"notebooks/reproduce/overflow_{index:02d}.ipynb"
+    with pytest.raises(SystemExit, match="family notebook count outside 1..20"):
+        validate_registry(over_cap)
+
+    cross_family = deepcopy(payload)
+    reassigned = next(row for row in cross_family["records"] if row["pipeline_family"] == "cellosaurus")
+    reassigned["pipeline_family"] = "depmap"
+    reassigned["source_family"] = "depmap"
+    reassigned["reproduce_notebook"] = "notebooks/reproduce/depmap_cell_context.ipynb"
+    with pytest.raises(SystemExit, match="authoritative pipeline family mismatch"):
+        validate_registry(cross_family)
+
+    wrong_producer = deepcopy(payload)
+    wrong_producer["records"][0]["producer"] = "manage_db/export_kg.py"
+    wrong_producer["records"][0]["producer_builder"] = "manage_db/export_kg.py"
+    with pytest.raises(SystemExit, match="authoritative producer mismatch"):
+        validate_registry(wrong_producer)
+
+    wrong_command = deepcopy(payload)
+    wrong_command["records"][0]["full_worker_rebuild_command"] = "uv run python -m manage_db.export_kg --task <task-id>"
+    wrong_command["records"][0]["rebuild_command_evidenced"] = True
+    with pytest.raises(SystemExit, match="authoritative rebuild command mismatch"):
+        validate_registry(wrong_command)
+
+    wrong_notebook = deepcopy(payload)
+    wrong_notebook["records"][0]["reproduce_notebook"] = "notebooks/reproduce/wrong_same_family.ipynb"
+    with pytest.raises(SystemExit, match="authoritative primary notebook mismatch"):
+        validate_registry(wrong_notebook)
+
+    contradictory_command_flag = deepcopy(payload)
+    no_command = next(row for row in contradictory_command_flag["records"] if row["full_worker_rebuild_command"] is None)
+    no_command["rebuild_command_evidenced"] = True
+    with pytest.raises(SystemExit, match="rebuild command evidence flag mismatch"):
+        validate_registry(contradictory_command_flag)
+
+
+def test_producer_and_rebuild_command_are_exact_per_output_not_family_wide() -> None:
+    records = {identity(row): row for row in registry()["records"]}
+    assert records[("nodes", "cell_line")]["producer"] is None
+    assert records[("features", "cell_line_textual_summary")]["producer"] == "manage_db/build_textual_summary_features.py"
+    assert records[("features", "cell_line_textual_summary")]["full_worker_rebuild_command"]
+    assert records[("nodes", "gene")]["producer"] is None
+    assert records[("features", "protein_sequence")]["producer"] == "manage_db/build_sequence_features.py"
+    assert records[("features", "protein_sequence")]["full_worker_rebuild_command"] is None
+    assert records[("features", "transcript_sequence")]["full_worker_rebuild_command"]
+    assert records[("edges", "pathway_contains_gene")]["producer"] is None
+    assert records[("evidence", "gene_ortholog_gene")]["producer"] is None
+    assert records[("edges", "tissue_expresses_protein")]["producer"] is None
+    assert records[("embedding", "gene_genomic_sequence_nucleotide_transformer_v2_50m_multi_species")]["producer"] is None
+    assert records[("embedding", "molecule_smiles_chemberta_77m_mlm")]["producer"] is None
+    assert records[("embedding", "gene_text_sbiobert_snli_multinli_stsb")]["producer"] == "manage_db/build_real_embeddings.py"
+    assert records[("nodes", "disease")]["full_worker_rebuild_command"] is None
 
 
 def test_records_are_complete_conservative_and_reconcile_catalog_and_receipts() -> None:
@@ -118,12 +223,13 @@ def test_tracked_links_and_evidenced_builders_exist() -> None:
 
 def test_generated_path_set_and_bytes_are_exact() -> None:
     payload = registry()
-    expected_paths = {ROOT / row["notebook"] for row in payload["records"]}
+    grouped = family_records(payload)
+    expected_paths = {ROOT / path for path in grouped}
     assert set(NOTEBOOK_DIR.glob("*.ipynb")) == expected_paths
     assert (NOTEBOOK_DIR / "README.md").read_text() == build_readme(payload)
-    for row in payload["records"]:
-        path = ROOT / row["notebook"]
-        assert path.read_text() == nbformat.writes(build_notebook(row)), path
+    for relative_path, rows in grouped.items():
+        path = ROOT / relative_path
+        assert path.read_text() == nbformat.writes(build_family_notebook(rows)), path
         notebook = nbformat.read(path, as_version=4)
         nbformat.validate(notebook)
         assert all(cell.execution_count is None and cell.outputs == [] for cell in notebook.cells if cell.cell_type == "code")
@@ -160,6 +266,9 @@ def test_notebooks_have_required_sections_and_no_machine_specific_or_secret_mate
         markdown = "\n".join(cell.source for cell in notebook.cells if cell.cell_type == "markdown")
         code = "\n".join(cell.source for cell in notebook.cells if cell.cell_type == "code")
         assert all(f"## {section}" in markdown for section in required_sections), path
+        assert "## Canonical outputs owned by this notebook" in markdown, path
+        assert markdown.count("### Output `") >= 1, path
+        assert "shared evidenced producer" not in markdown.lower(), path
         assert not any(token in markdown or token in code for token in forbidden), path
         assert not re.search(r"(?i)(password|api[_-]?key|secret)\s*=\s*['\"][^'\"]+", code), path
         assert "subprocess" not in code and "os.system" not in code
@@ -170,13 +279,13 @@ def test_notebooks_have_required_sections_and_no_machine_specific_or_secret_mate
 
 def test_representative_notebook_from_every_layer_executes_offline(tmp_path: Path) -> None:
     selected = {
-        "nodes": "nodes__dataset.ipynb",  # provenance-gap
-        "edges": "edges__mutation_in_gene.ipynb",
-        "evidence": "evidence__protein_interacts_protein.ipynb",
-        "features": "features__molecule_fingerprint.ipynb",  # documented-not-replayed
-        "embedding": "embedding__gene_text_sbiobert_snli_multinli_stsb.ipynb",
+        "txgnn_legacy_bundle.ipynb",  # nodes, edges, evidence, features + provenance gaps
+        "opentargets_associations.ipynb",  # nodes, edges, evidence
+        "ensembl_identity_and_sequence.ipynb",  # nodes, edges, features
+        "text_embeddings.ipynb",  # embedding
+        "molecule_fingerprints.ipynb",  # documented-not-replayed
     }
-    for layer, name in selected.items():
+    for name in selected:
         notebook = nbformat.read(NOTEBOOK_DIR / name, as_version=4)
         executed = NotebookClient(
             notebook,
@@ -185,8 +294,8 @@ def test_representative_notebook_from_every_layer_executes_offline(tmp_path: Pat
             resources={"metadata": {"path": str(tmp_path)}},
         ).execute()
         code_cells = [cell for cell in executed.cells if cell.cell_type == "code"]
-        assert all(cell.execution_count is not None for cell in code_cells), layer
-        assert any(output.get("data", {}).get("text/plain", "").find("SKIPPED") >= 0 for output in code_cells[-1].outputs), layer
+        assert all(cell.execution_count is not None for cell in code_cells), name
+        assert any(output.get("data", {}).get("text/plain", "").find("SKIPPED") >= 0 for output in code_cells[-1].outputs), name
 
 
 def test_generator_check_passes_in_subprocess() -> None:

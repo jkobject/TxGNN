@@ -208,18 +208,95 @@ FAMILIES: dict[str, dict[str, Any]] = {
         "problems": "The migration receipt preserves all historical shard names and compaction checks, but no selected native ReMap raw object or current source-native builder is retained.",
         "links": ["docs/remap_crm_canonical_readiness.md", "docs/storage-migration-20260727/README.md"],
     },
-    "embeddings": {
-        "label": "Reviewed foundation/text/sequence/molecule embedding pipelines",
-        "release": "Accepted immutable embedding candidates; exact model/source revision is row-level and in preserved release evidence where available",
+    "text_embeddings": {
+        "label": "Source-backed biomedical text embedding pipeline",
+        "release": "Accepted immutable S-BioBERT text embedding candidate; exact source revision is row-level and in preserved release evidence where available",
         "native_inputs": [],
         "builder": "manage_db/build_real_embeddings.py",
         "command": None,
         "mappings": "Join exact canonical node IDs to source-feature keys and hashes; preserve model, pooling, normalization and coverage metadata.",
-        "transformations": "Encode source-backed text, sequence or molecule features with the recorded model family and retain deterministic feature lineage.",
+        "transformations": "Encode source-backed textual summaries with the recorded S-BioBERT model, pooling and normalization policy; retain deterministic feature lineage.",
         "exclusions": "Do not fabricate vectors for missing source payloads or treat similarity as causality/equivalence; learned fallback stays model-side.",
-        "problems": "The accepted objects and migration receipts survive, but a single verified exact argv with pinned model revisions and all source-feature checksums is not tracked for every leaf.",
+        "problems": "The accepted text-vector objects and migration receipts survive, but a single verified exact argv with pinned model revision and all source-feature checksums is not tracked for every leaf.",
         "links": ["reproduce/29_official_features_exports_reproduction.ipynb", "manage_db/build_real_embeddings.py"],
     },
+    "sequence_embeddings": {
+        "label": "Nucleotide Transformer and ESM2 sequence embedding pipelines",
+        "release": "Accepted immutable genomic/transcript/protein sequence embedding candidates; model identity is encoded in each canonical leaf",
+        "native_inputs": [],
+        "builder": "manage_db/build_real_embeddings.py",
+        "command": None,
+        "mappings": "Join exact ENSG, ENST or ENSP canonical IDs to source sequences and hashes; preserve model, pooling, normalization and coverage metadata.",
+        "transformations": "Encode genomic, transcript or protein sequence with the leaf-specific Nucleotide Transformer or ESM2 model and retain deterministic feature lineage.",
+        "exclusions": "Do not fabricate vectors for missing sequences, cross-project one sequence modality into another or treat similarity as biological evidence.",
+        "problems": "Accepted sequence-vector objects and migration receipts survive, but no single verified argv with pinned model revisions and all accepted input checksums covers every sequence leaf.",
+        "links": ["reproduce/29_official_features_exports_reproduction.ipynb", "manage_db/build_real_embeddings.py"],
+    },
+    "molecule_embeddings": {
+        "label": "ChemBERTa molecule-structure embedding pipeline",
+        "release": "Accepted immutable ChemBERTa molecule SMILES embedding candidate; exact source revision is preserved in release evidence where available",
+        "native_inputs": ["gs://jouvencekb/main/nodes/molecule.parquet"],
+        "builder": "manage_db/build_real_embeddings.py",
+        "command": None,
+        "mappings": "Join canonical molecule IDs to validated source structures and hashes; preserve model, pooling, normalization and coverage metadata.",
+        "transformations": "Encode valid canonical molecule structures with the recorded ChemBERTa model and retain deterministic feature lineage.",
+        "exclusions": "Reject missing or invalid structures; do not fabricate vectors or treat chemical similarity as biological evidence.",
+        "problems": "The accepted molecule-vector object and migration receipt survive, but the exact pinned production argv and structure-input checksum set are incomplete.",
+        "links": ["reproduce/29_official_features_exports_reproduction.ipynb", "manage_db/build_real_embeddings.py"],
+    },
+}
+
+FAMILY_NOTEBOOKS = {
+    "opentargets": "opentargets_associations.ipynb",
+    "txgnn_legacy": "txgnn_legacy_bundle.ipynb",
+    "cellosaurus": "cellosaurus_identity.ipynb",
+    "depmap": "depmap_cell_context.ipynb",
+    "ensembl": "ensembl_identity_and_sequence.ipynb",
+    "hpo": "human_phenotype_ontology.ipynb",
+    "reactome": "reactome_pathways.ipynb",
+    "hpa": "hpa_protein_context.ipynb",
+    "biogrid": "biogrid_protein_interactions.ipynb",
+    "uniprot": "uniprot_protein_text.ipynb",
+    "uberon": "uberon_anatomy.ipynb",
+    "rdkit": "molecule_fingerprints.ipynb",
+    "clinical_trials": "clinical_trials.ipynb",
+    "remap": "remap_regulatory_support.ipynb",
+    "text_embeddings": "text_embeddings.ipynb",
+    "sequence_embeddings": "sequence_embeddings.ipynb",
+    "molecule_embeddings": "molecule_embeddings.ipynb",
+}
+
+# Producer evidence is fail-closed and per canonical output. Related family
+# code is still linked as context, but is not promoted to `producer` unless the
+# tracked implementation actually emits that exact output.
+EXACT_PRODUCERS = {
+    "features__cell_line_textual_summary": "manage_db/build_textual_summary_features.py",
+    "edges__cell_line_gene_essentiality": "manage_db/build_staged_cell_line_assays.py",
+    "evidence__cell_line_gene_essentiality": "manage_db/build_staged_cell_line_assays.py",
+    "features__protein_sequence": "manage_db/build_sequence_features.py",
+    "features__transcript_sequence": "manage_db/build_sequence_features.py",
+    "features__phenotype_textual_summary": "manage_db/build_textual_summary_features.py",
+    "features__protein_textual_summary": "manage_db/build_textual_summary_features.py",
+    "features__tissue_textual_summary": "manage_db/build_textual_summary_features.py",
+    "features__molecule_fingerprint": "manage_db/build_node_missing_features.py",
+    "embedding__cell_line_text_sbiobert_snli_multinli_stsb": "manage_db/build_real_embeddings.py",
+    "embedding__cell_type_text_sbiobert_snli_multinli_stsb": "manage_db/build_real_embeddings.py",
+    "embedding__disease_text_sbiobert_snli_multinli_stsb": "manage_db/build_real_embeddings.py",
+    "embedding__gene_text_sbiobert_snli_multinli_stsb": "manage_db/build_real_embeddings.py",
+    "embedding__molecule_text_sbiobert_snli_multinli_stsb": "manage_db/build_real_embeddings.py",
+    "embedding__pathway_text_sbiobert_snli_multinli_stsb": "manage_db/build_real_embeddings.py",
+    "embedding__phenotype_text_sbiobert_snli_multinli_stsb": "manage_db/build_real_embeddings.py",
+    "embedding__protein_text_sbiobert_snli_multinli_stsb": "manage_db/build_real_embeddings.py",
+    "embedding__tissue_text_sbiobert_snli_multinli_stsb": "manage_db/build_real_embeddings.py",
+}
+
+EXACT_COMMANDS = {
+    "features__cell_line_textual_summary": FAMILIES["cellosaurus"]["command"],
+    "features__transcript_sequence": FAMILIES["ensembl"]["command"],
+    "features__phenotype_textual_summary": FAMILIES["hpo"]["command"],
+    "features__protein_textual_summary": FAMILIES["uniprot"]["command"],
+    "features__tissue_textual_summary": FAMILIES["uberon"]["command"],
+    "features__molecule_fingerprint": FAMILIES["rdkit"]["command"],
 }
 
 OPEN_TARGETS_PREFIXES = (
@@ -242,7 +319,11 @@ DOCUMENTED_IDS = {
 
 def family_for(layer: str, name: str) -> str:
     if layer == "embedding":
-        return "embeddings"
+        if name == "molecule_smiles_chemberta_77m_mlm":
+            return "molecule_embeddings"
+        if "sequence" in name:
+            return "sequence_embeddings"
+        return "text_embeddings"
     if layer == "nodes":
         return {
             "cell_line": "cellosaurus",
@@ -300,6 +381,16 @@ def status_for(dataset_id: str, family: str) -> str:
     return "historical-builder-only"
 
 
+def producer_for(dataset_id: str, family_id: str) -> str | None:
+    del family_id  # family membership is validated separately and cannot grant producer evidence
+    return EXACT_PRODUCERS.get(dataset_id)
+
+
+def command_for(dataset_id: str, family_id: str) -> str | None:
+    del family_id  # commands are accepted only from the exact-output allowlist
+    return EXACT_COMMANDS.get(dataset_id)
+
+
 def _migration_receipts(payload: dict[str, Any]) -> dict[str, dict[str, Any]]:
     receipts: dict[str, dict[str, Any]] = {}
     for row in payload["copy_objects"]:
@@ -342,15 +433,17 @@ def build_registry() -> dict[str, Any]:
         dataset_id = f"{layer}__{name}"
         family_id = family_for(layer, name)
         family = FAMILIES[family_id]
+        producer = producer_for(dataset_id, family_id)
+        command = command_for(dataset_id, family_id)
         status = status_for(dataset_id, family_id)
         object_row = dataset["objects"][0]
         canonical_relative = dataset["uri"].removeprefix("gs://jouvencekb/")
         gap_fields = []
         if not family["native_inputs"]:
             gap_fields.append("retained native input")
-        if not family["builder"]:
+        if not producer:
             gap_fields.append("current builder")
-        if not family["command"]:
+        if not command:
             gap_fields.append("verified exact rebuild command")
         if status == "provenance-gap":
             gap_fields.append("exact accepted source-to-object lineage")
@@ -364,13 +457,16 @@ def build_registry() -> dict[str, Any]:
         record = {
             "layer": layer,
             "name": name,
-            "notebook": f"notebooks/reproduce/{dataset_id}.ipynb",
+            "reproduce_notebook": f"notebooks/reproduce/{FAMILY_NOTEBOOKS[family_id]}",
+            "pipeline_family": family_id,
             "catalog_page": f"docs/parquet-catalog/datasets/{dataset_id}.md",
             "canonical_uri": dataset["uri"],
             "meaning": dataset["semantics"]["meaning"],
             "non_meaning": dataset["semantics"].get("non_meaning", "No additional non-meaning is declared in the current catalog."),
             "source_family": family_id,
             "source_family_label": family["label"],
+            "producer": producer,
+            "native_source": family["native_inputs"],
             "native_inputs": family["native_inputs"],
             "release": family["release"],
             "acquisition_and_preconditions": "Read-only by default. Network, requester-pays GCS and production rebuilds require explicit opt-in; full rebuilds run only on an approved in-region worker with task-local staging.",
@@ -381,9 +477,9 @@ def build_registry() -> dict[str, Any]:
             "deduplication_and_evidence": "Deduplicate graph assertions by the declared relation/endpoint contract. Preserve source-specific multiplicity, scores, studies, assays and predicates in evidence or feature sidecars; do not treat migration copies as biological evidence.",
             "quarantines_exclusions_missing": family["exclusions"],
             "problems_and_decisions": family["problems"],
-            "producer_builder": family["builder"],
-            "full_worker_rebuild_command": family["command"],
-            "rebuild_command_evidenced": family["command"] is not None,
+            "producer_builder": producer,
+            "full_worker_rebuild_command": command,
+            "rebuild_command_evidenced": command is not None,
             "safe_bounded_replay": "Validate this frozen registry record, schema contract and migration receipt offline. Optional live mode reads only canonical object metadata/Parquet footer with caller-owned ADC and JOUVENCE_BILLING_PROJECT; it does not scan rows or write.",
             "qc": {
                 "rows": dataset["rows"],
@@ -399,12 +495,14 @@ def build_registry() -> dict[str, Any]:
             "migration_receipt": receipts[canonical_relative],
             "reproducibility_status": status,
             "provenance_gaps": sorted(set(gap_fields)),
+            "replay_level": status,
+            "known_gaps": sorted(set(gap_fields)),
             "reproducibility_limits": "This notebook documents and checks current artifact identity. It does not prove that historical native inputs can recreate identical biological rows unless the status and evidence explicitly establish that stronger claim.",
             "links": list(dict.fromkeys(links)),
         }
         records.append(record)
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "canonical_inventory": "docs/parquet-catalog/inventory.json",
         "canonical_root": catalog["canonical_root"],
         "record_count": len(records),
