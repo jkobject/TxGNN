@@ -15,10 +15,25 @@ class _BlobIterator:
 
 
 class _Client:
-    def __init__(self, *, objects: set[str], prefixes: set[str]) -> None:
+    def __init__(
+        self,
+        *,
+        objects: set[str],
+        prefixes: set[str],
+        lifecycle_rules=None,
+        soft_delete_policy=None,
+    ) -> None:
         self._objects = objects
         self._prefixes = prefixes
-        self._bucket = object()
+        self._bucket = SimpleNamespace(
+            lifecycle_rules=lifecycle_rules
+            if lifecycle_rules is not None
+            else [],
+            soft_delete_policy=soft_delete_policy
+            if soft_delete_policy is not None
+            else {"retentionDurationSeconds": 604800},
+            reload=lambda: None,
+        )
 
     def bucket(self, bucket: str):
         assert bucket == "jouvencekb"
@@ -53,3 +68,24 @@ def test_legacy_prefixes_remain_rejected(monkeypatch) -> None:
     monkeypatch.setattr("google.cloud.storage.Client", lambda: client)
 
     assert "unexpected root prefixes: ['kg/']" in contract.check_live()
+
+
+def test_live_policy_requires_no_lifecycle_and_seven_day_soft_delete(monkeypatch) -> None:
+    client = _Client(
+        objects={"README.md"},
+        prefixes={".lamin/", "raw/", "main/"},
+        lifecycle_rules=[
+            {"action": {"type": "Delete"}, "condition": {"age": 14, "matchesPrefix": ["staging/"]}}
+        ],
+        soft_delete_policy={"retentionDurationSeconds": 0},
+    )
+    monkeypatch.setattr("google.cloud.storage.Client", lambda: client)
+
+    errors = contract.check_live()
+
+    assert "lifecycle policy mismatch" in "\n".join(errors)
+    assert "soft-delete policy mismatch" in "\n".join(errors)
+
+
+def test_current_access_runbook_is_an_active_guarded_surface() -> None:
+    assert contract.ROOT / "docs" / "txgnn_access_runbook.md" in contract.SINGLE_FILES

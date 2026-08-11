@@ -3,7 +3,9 @@
 Stable data, the single derived PyG artifact, LaminDB state, and temporary
 candidates share `gs://jouvencekb` under disjoint prefixes. Only `raw/` and
 `main/` are canonical public data. `pyg/` is a reproducible derived training
-layer. The bucket currently has no lifecycle rule; staging cleanup is explicit.
+layer. The bucket has no lifecycle rule: staging candidates are deleted
+explicitly once their promotion or rejection is complete. Bucket soft delete
+retains manually deleted objects for 604800 seconds (7 days) for recovery.
 
 ## Namespaces
 
@@ -103,7 +105,8 @@ with memory mapping.
    or the reviewed current generation for an intentional replacement).
 4. Read back CRC32C, size, Parquet footer, row count, and schema.
 5. Refresh and check `docs/parquet-catalog/` against the live bucket.
-6. Delete the staging candidate explicitly only after canonical readback passes.
+6. Delete the staging candidate explicitly after canonical readback passes (or
+   after a rejected candidate has no remaining audit value).
 
 For PyG, build under `staging/<build-id>/pyg`, validate exact source generations,
 adjacency, feature alignment and split leakage, replace the current `pyg/`
@@ -129,5 +132,8 @@ The live machine-readable inventory and generated dataset pages live under
 where applicable. Promotion receipts and detailed migration manifests are Git
 artifacts, not a bucket namespace.
 
-Live bucket readback on 2026-07-28 reported no lifecycle, soft-delete, or object
-versioning configuration. Clean `staging/` explicitly; it is not an archive.
+The 2026-07-28 readback recorded no lifecycle or soft-delete policy. A temporary
+14-day `staging/` lifecycle was later enabled, then removed by explicit product
+decision on 2026-08-09. Current policy has no lifecycle rule and keeps soft-delete
+retention of 604800 seconds. The live storage-layout guard requires both exact
+settings. `staging/` remains non-canonical and is not an archive.

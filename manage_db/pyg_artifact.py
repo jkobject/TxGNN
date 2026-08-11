@@ -93,7 +93,11 @@ def verify_pyg_build(build: LocalPygBuild) -> None:
         expected_size = int(entry["size"])
         if path.stat().st_size != expected_size:
             raise ValueError(f"size mismatch for {relative}")
-        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        hasher = hashlib.sha256()
+        with path.open("rb") as stream:
+            for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                hasher.update(chunk)
+        digest = hasher.hexdigest()
         if digest != entry["sha256"]:
             raise ValueError(f"checksum mismatch for {relative}")
 

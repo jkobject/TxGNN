@@ -19,6 +19,7 @@ SINGLE_FILES = (
     ROOT / "TODO.md",
     ROOT / "docs" / "storage.md",
     ROOT / "docs" / "getting-started-data.md",
+    ROOT / "docs" / "txgnn_access_runbook.md",
 )
 TEXT_SUFFIXES = {".py", ".sh", ".md", ".toml", ".yaml", ".yml", ".json"}
 FORBIDDEN = (
@@ -38,6 +39,8 @@ ALLOWED_TOP_LEVEL_OBJECTS = {"README.md"}
 REQUIRED_TOP_LEVEL_PREFIXES = {".lamin/", "raw/", "main/"}
 OPTIONAL_TOP_LEVEL_PREFIXES = {"pyg/", "staging/"}
 ALLOWED_TOP_LEVEL_PREFIXES = REQUIRED_TOP_LEVEL_PREFIXES | OPTIONAL_TOP_LEVEL_PREFIXES
+EXPECTED_LIFECYCLE_RULES: list[dict[str, object]] = []
+EXPECTED_SOFT_DELETE_SECONDS = 604800
 
 
 def active_files() -> list[Path]:
@@ -68,6 +71,7 @@ def check_live() -> list[str]:
 
     client = importlib.import_module("google.cloud.storage").Client()
     bucket = client.bucket("jouvencekb")
+    bucket.reload()
     iterator = client.list_blobs(bucket, delimiter="/", max_results=1000)
     root_objects = {blob.name for blob in iterator}
     prefixes = set(iterator.prefixes)
@@ -86,6 +90,17 @@ def check_live() -> list[str]:
         errors.append(f"missing root objects: {missing_objects}")
     if missing_prefixes:
         errors.append(f"missing root prefixes: {missing_prefixes}")
+    lifecycle_rules = list(bucket.lifecycle_rules)
+    if lifecycle_rules != EXPECTED_LIFECYCLE_RULES:
+        errors.append(
+            f"lifecycle policy mismatch: expected {EXPECTED_LIFECYCLE_RULES!r}, got {lifecycle_rules!r}"
+        )
+    soft_delete_seconds = int(bucket.soft_delete_policy.get("retentionDurationSeconds", 0))
+    if soft_delete_seconds != EXPECTED_SOFT_DELETE_SECONDS:
+        errors.append(
+            "soft-delete policy mismatch: "
+            f"expected {EXPECTED_SOFT_DELETE_SECONDS}s, got {soft_delete_seconds}s"
+        )
     return errors
 
 

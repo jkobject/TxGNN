@@ -303,3 +303,14 @@ def test_uniprot_ensp_ambiguity_audit_counts_source_rows_and_expanded_edges(tmp_
     assert audit["ambiguous_hpa_distinct_protein_component_edges"] == 6
     assert "all ENSP" in audit["current_policy"]
     assert "canonical ENSP" in audit["promotion_recommendation"]
+
+
+def test_default_download_inputs_use_pipeline_local_cache() -> None:
+    import manage_db.build_hpa_cellular_components as hpa
+
+    args = hpa.build_parser().parse_args([])
+
+    assert args.hpa_zip == "artifacts/cache/hpa-cellular-components/hpa/proteinatlas.tsv.zip"
+    assert args.go_obo == "artifacts/cache/hpa-cellular-components/go/go-basic.obo"
+    assert args.uniprot_subcell == "artifacts/cache/hpa-cellular-components/uniprot/subcell.txt"
+    assert "main/raw" not in " ".join([args.hpa_zip, args.go_obo, args.uniprot_subcell])

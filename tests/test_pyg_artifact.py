@@ -15,6 +15,7 @@ from manage_db.pyg_artifact import (
     materialize_pyg_build,
     open_pyg_stores,
     resolve_pyg_build,
+    verify_pyg_build,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -83,6 +84,19 @@ def test_checksum_failure_is_fatal(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="checksum mismatch"):
         materialize_pyg_build(build, tmp_path / "cache", verify=True)
+
+
+def test_verification_streams_checksum_without_read_bytes(tmp_path: Path, monkeypatch) -> None:
+    source = tmp_path / "source"
+    _write_manifest(source)
+    local = materialize_pyg_build(resolve_pyg_build(source), tmp_path / "cache", verify=False)
+
+    def reject_read_bytes(path: Path) -> bytes:
+        raise AssertionError(f"whole-file read forbidden: {path}")
+
+    monkeypatch.setattr(Path, "read_bytes", reject_read_bytes)
+
+    verify_pyg_build(local)
 
 
 def test_open_empty_reviewed_stores(tmp_path: Path) -> None:

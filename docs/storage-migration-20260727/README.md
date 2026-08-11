@@ -23,9 +23,11 @@ gs://jouvencekb/
 GCS has no real directories. `edges_inferred/` and `evidence_inferred/` remain
 absent while they contain no accepted Parquet tables.
 
-Temporary candidates belong under `gs://jouvencekb/staging` and are cleaned
-explicitly. Live bucket readback on 2026-07-28 showed no lifecycle, soft-delete,
-or object-versioning configuration. LaminDB internals live under
+Temporary candidates belong under `gs://jouvencekb/staging`. The migration-time
+readback on 2026-07-28 showed no lifecycle or soft-delete policy. A temporary
+14-day lifecycle for `staging/` was observed and then removed by product decision
+on 2026-08-09. Current policy has no lifecycle rule; bucket soft delete retains
+manual deletions for 604800 seconds (7 days). LaminDB internals live under
 `gs://jouvencekb/.lamin` and are excluded from the public data contract.
 
 ## Frozen pre-migration evidence
@@ -145,7 +147,8 @@ their storage/exclusion metadata.
 
 The temporary staging bucket contained zero objects, so there was nothing to
 move. It was deleted. `gs://jouvencekb/staging/` is the only future staging
-namespace and has explicit cleanup rather than an active lifecycle rule.
+namespace. Explicit cleanup after promotion or rejection is required; no
+automatic age-based deletion is configured.
 
 ## Repository cutover and validation
 
@@ -183,9 +186,10 @@ Before deleting old prefixes:
 
 On 2026-07-28 the operator revalidated the 110/110 live catalog, active
 `.lamin/` surface and stopped workers, then deleted `kg/`, `.lamindb/`, `lamin/`,
-`_clawd_probe.txt`, and the empty `gcloud/` folder marker. Because soft delete
-was not active, this cleanup is not recoverable through a bucket soft-delete
-window; the migration receipts remain the durable audit record.
+`_clawd_probe.txt`, and the empty `gcloud/` folder marker. Soft delete was not
+active at that dated cleanup, so those deletions are not recoverable through the
+soft-delete policy enabled later; the migration receipts remain the durable
+audit record.
 
 ## Why the bucket became much smaller
 
