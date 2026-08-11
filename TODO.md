@@ -2,7 +2,7 @@
 
 Kanban board `txgnn` remains the dispatch/source-of-truth. This file is a compact human overview; detailed phase mirrors live in `todo.d/`.
 
-_Status snapshot: 2026-07-19 CEST._
+_Status snapshot: 2026-08-11 CEST._
 
 ## Operating rule
 
@@ -39,7 +39,7 @@ Avoid bare “done” except as a Kanban state. Use:
 - `stopped-by-user`
 - `production/full done`
 
-## Review snapshot — 2026-07-19
+## Review snapshot — 2026-08-11
 
 This snapshot supersedes the older June/July execution notes below. Detailed denominators and evidence are in `todo.d/01_lamindb.md`, `todo.d/02_pyg_gnn.md`, and `todo.d/03_embeddings.md`.
 
@@ -66,6 +66,7 @@ Use the live board plus the dated phase files below as the current-state anchor.
 Use these, not old `.omoc` reports:
 
 - `docs/kg_schema_overview.md`
+- `docs/relation-evidence-ledger.json` (deterministic machine-readable source)
 - `docs/relation_coverage_current.md`
 - `reproduce/15_kg_schema_overview.ipynb`
 - `docs/relation_backlog_prioritized.md`
@@ -73,15 +74,18 @@ Use these, not old `.omoc` reports:
 Accepted snapshot:
 
 - active declared relations: `67`
-- canonical active edge relations: `40`; the three previously review-required canonical writes are independently review-accepted at their unchanged object generations by `t_2d1f767d`
-- canonical relations with evidence: `18`
-- canonical relations without evidence: `22`
-- declared relations not canonical yet: `27`
-- staged-only/deferred: `18`
-- source-audit-only/deferred: `2`
-- feature-context-not-edge: `2`
-- schema-only/missing: `5`
-- canonical edge rows: `100,080,390`
+- canonical active edge relations: `43`
+- canonical relations with evidence: `22`
+- canonical relations without evidence: `21`
+- declared relations not canonical yet: `24`
+- noncanonical source-audit/deferred: `9`
+- noncanonical feature/context: `2`
+- noncanonical schema-only/missing: `5`
+- noncanonical metadata-only: `5`
+- noncanonical explicit-policy-defer: `3`
+- current immutable staged candidates proven by the prescribed source set: `0`
+- canonical edge rows: `103,181,903`
+- canonical evidence rows: `78,035,525`
 - node rows: `55,523,691`
 
 ## Active priorities
@@ -169,6 +173,7 @@ Cards:
 Use `docs/relation_backlog_prioritized.md` and `todo.d/04_relations.md`. A relation is not complete until canonical promoted+reviewed or explicitly accepted as staged/deferred.
 
 - `t_15d71ef0` — relation provenance reconciliation: five canonical legacy molecule relations remain explicitly `provenance-gap`; PR #44 `disease_associated_protein`, PR #15 PRISM 20Q2, and the PR #41 zero-row inferred result are preserved in `docs/relation-provenance-and-gaps.md`. This is documentation/backlog status only and authorizes no rebuild or canonical write.
+- `t_ac616200` — fresh flat-layout ledger: `67` active relations, `43` canonical edges, `22` evidence tables, `21` edge-without-evidence routes, and `24` noncanonical active relations. Use `docs/relation-evidence-ledger.json`; historical staged row counts are not current immutable inventory.
 
 ### 7. Process hygiene
 
