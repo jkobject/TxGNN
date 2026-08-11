@@ -6,7 +6,7 @@ Source of truth used for this policy:
 
 - relation coverage: `docs/relation_coverage_current.md`
 - schema overview: `docs/kg_schema_overview.md`
-- historical audit root: `/Users/jkobject/mnt/gcs/jouvencekb-kg/v2` (read-only historical snapshot; current canonical root is `gs://jouvencekb/main`)
+- historical audit root: `gs://jouvencekb/kg/v2` (superseded, non-executable history; current canonical root is `gs://jouvencekb/main`)
 - bounded audit prototype: `scripts/audit_inferred_edges_candidates.py`
 - bounded audit output: `artifacts/reports/t_f0ad9dff_inferred_edge_candidates.json`
 
