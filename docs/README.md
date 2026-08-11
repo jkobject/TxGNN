@@ -23,8 +23,10 @@ This directory is the single home for durable project knowledge. Start at the re
 
 ### Schema, provenance, and source policy
 
-- [`kg_schema_overview.md`](kg_schema_overview.md) — dated schema and relation inventory.
-- [`relation_coverage_current.md`](relation_coverage_current.md) — dated per-relation coverage mirror.
+- [`kg_schema_overview.md`](kg_schema_overview.md) — current flat-layout schema overview and exact denominators.
+- [`relation-evidence-ledger.json`](relation-evidence-ledger.json) — deterministic machine-readable one-row-per-active-relation ledger.
+- [`relation_coverage_current.md`](relation_coverage_current.md) — generated human view of the relation/evidence ledger.
+- [`relation_backlog_prioritized.md`](relation_backlog_prioritized.md) — terminal no-evidence and noncanonical routing backlog.
 - [`relation-provenance-and-gaps.md`](relation-provenance-and-gaps.md) — durable provenance contract for five legacy molecule relation gaps plus reconciled PR #44, PR #15, and PR #41 relation work.
 - [`evidence_and_edge_schema_plan.md`](evidence_and_edge_schema_plan.md) — assertion/evidence separation.
 - [`source_native_expansion_policy.md`](source_native_expansion_policy.md) — source and endpoint policy.
