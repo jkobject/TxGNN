@@ -53,7 +53,7 @@ def _write_fixture(root: Path) -> None:
                 "tf_gene_id": None,
                 "tf_symbol_sample": "A1BG",
                 "enhancer_id": "EH:chr1:100-200",
-                "enhancer_chromosome": "chr1",
+                "enhancer_chromosome": "1",
                 "enhancer_start": 100,
                 "enhancer_end": 200,
                 "support_entity_id": "EH:chr1:100-200",
@@ -82,7 +82,7 @@ def _write_fixture(root: Path) -> None:
                 "tf_gene_id": None,
                 "tf_symbol_sample": "GATA1",
                 "enhancer_id": "EH:chr1:300-400",
-                "enhancer_chromosome": "chr1",
+                "enhancer_chromosome": "1",
                 "enhancer_start": 300,
                 "enhancer_end": 400,
                 "support_entity_id": "EH:chr1:300-400",
@@ -207,8 +207,8 @@ def _write_fixture(root: Path) -> None:
         ],
         columns=reader.TF_GLOBAL_COLUMNS,
     ))
-    frames[0].loc[frames[0]["support_entity_type"] == "tf", "enhancer_chromosome"] = "chr1"
-    frames[1].loc[frames[1]["support_entity_type"] == "tf", "enhancer_chromosome"] = "chrX"
+    frames[0].loc[frames[0]["support_entity_type"] == "tf", "enhancer_chromosome"] = "1"
+    frames[1].loc[frames[1]["support_entity_type"] == "tf", "enhancer_chromosome"] = "X"
     pd.concat(frames, ignore_index=True).to_parquet(sidecar, index=False)
 
     pd.DataFrame([{"id": "NCBI:1"}, {"id": "NCBI:2"}]).to_parquet(nodes / "gene.parquet", index=False)
@@ -352,18 +352,21 @@ def test_status_reports_support_only_semantics(tmp_path: Path, capsys) -> None:
     assert "not observed binding" in status["semantics"]
 
 
-def test_compacted_sidecar_supports_bounded_chromosome_reads(tmp_path: Path) -> None:
+@pytest.mark.parametrize("chromosome", ["1", "chr1"])
+def test_compacted_sidecar_supports_canonical_chromosome_reads(
+    tmp_path: Path, chromosome: str
+) -> None:
     compact = tmp_path / "features" / "remap_crm_tf_enhancer_support.parquet"
     compact.parent.mkdir(parents=True)
     pd.DataFrame(
         [
-            {"enhancer_chromosome": "chr1", "tf_symbol_sample": "A1BG", "enhancer_id": "EH:1"},
-            {"enhancer_chromosome": "chr2", "tf_symbol_sample": "GATA1", "enhancer_id": "EH:2"},
+            {"enhancer_chromosome": "1", "tf_symbol_sample": "A1BG", "enhancer_id": "EH:1"},
+            {"enhancer_chromosome": "2", "tf_symbol_sample": "GATA1", "enhancer_id": "EH:2"},
         ]
     ).to_parquet(compact, index=False)
 
     result = reader.read_chromosome_support(
-        "1",
+        chromosome,
         prefix=compact,
         columns=["tf_symbol_sample", "enhancer_id"],
         limit=1,
@@ -371,6 +374,11 @@ def test_compacted_sidecar_supports_bounded_chromosome_reads(tmp_path: Path) -> 
 
     assert result.to_dict(orient="records") == [{"tf_symbol_sample": "A1BG", "enhancer_id": "EH:1"}]
     assert reader.chromosome_shard_path("1", prefix=compact) == str(compact)
+
+
+def test_compacted_sidecar_rejects_invalid_chromosome(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="Unsupported chromosome"):
+        reader.read_chromosome_support("chrM", prefix=tmp_path, limit=1)
 
 
 def test_default_sidecar_is_single_direct_gcs_object() -> None:

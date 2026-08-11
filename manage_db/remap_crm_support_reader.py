@@ -263,7 +263,7 @@ def read_chromosome_support(
     path = chromosome_shard_path(chromosome, prefix=prefix)
     wanted_columns = list(columns) if columns is not None else None
     filters = [
-        ("enhancer_chromosome", "==", f"chr{chrom}"),
+        ("enhancer_chromosome", "==", chrom),
         *(
             _summary_filters(
                 tf_gene_id=tf_gene_id,
