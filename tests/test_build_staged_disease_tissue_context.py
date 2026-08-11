@@ -11,6 +11,7 @@ from manage_db.build_staged_disease_tissue_context import (
     audit_non_edge_sources,
     build_hpa_disease_tissue,
     validate_outputs,
+    parse_args,
 )
 
 
@@ -92,3 +93,11 @@ def test_validation_requires_endpoint_and_evidence_support() -> None:
     assert validation["checks"]["endpoint_antijoin"]["ok"] is True
     assert validation["checks"]["evidence_support"]["ok"] is True
     assert validation["checks"]["no_forbidden_phenotype_anatomy_inference"]["ok"] is True
+
+
+def test_default_download_cache_is_pipeline_local() -> None:
+    args = parse_args([])
+
+    assert args.cache_dir == "artifacts/cache/disease-tissue-context"
+    assert args.node_root == "data/kg/nodes"
+    assert "main/raw" not in args.cache_dir

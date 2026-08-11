@@ -12,11 +12,11 @@ Route C is complete as the selected support-only product outcome. The accepted s
 Accepted support-only artifacts:
 
 - `t_3b8a2c4d` — CRM support/QA first10k chr1 `pilot accepted`/`staged-only`.
-- Prefix: `gs://jouvencekb/kg/staging/source-native-expansion/remap-crm-tf-binds-enhancer-support-chr1-first10k-20260623-t_3b8a2c4d/`
+- Prefix: `gs://jouvencekb/staging/source-native-expansion/remap-crm-tf-binds-enhancer-support-chr1-first10k-20260623-t_3b8a2c4d/`
 - `t_b599d3bb` — CRM support/QA all-chromosome bounded 5k-per-chrom artifact accepted as staged-only/support-only.
-- Prefix: `gs://jouvencekb/kg/staging/source-native-expansion/remap-crm-tf-binds-enhancer-support-allchrom-5kperchrom-20260623-t_b599d3bb/all_chrom_5k_per_chrom/`
-- `t_f2a2952e` — full/unbounded CRM support/QA sidecar `canonical promoted full support sidecar` / `review-required` after readiness gate `t_7e356c5c` and reviewer `t_0d77b4f0`.
-- Prefix: `gs://jouvencekb/kg/v2/features/remap_crm_tf_enhancer_support_full/` with 24 chromosome summary shards, `tf_global_summary.parquet`, `manifest.json`, and `metadata.json`; see `docs/remap_crm_full_support_sidecar_canonical_promotion_t_f2a2952e.md`.
+- Prefix: `gs://jouvencekb/staging/source-native-expansion/remap-crm-tf-binds-enhancer-support-allchrom-5kperchrom-20260623-t_b599d3bb/all_chrom_5k_per_chrom/`
+- `t_f2a2952e` — historical full/unbounded CRM support/QA sidecar lineage accepted before the flat-layout migration.
+- Current canonical object: `gs://jouvencekb/main/features/remap_crm_tf_enhancer_support.parquet`, compacted from the 24 chromosome shards, with 48,768,788 rows. The old sharded prefix was removed during migration; see `docs/storage-migration-20260727/README.md`.
 - Semantics: `crm_aggregated_support` / support-QA only.
 - Not `observed_binding`; not `tf_regulates_gene`; not canonical `tf_binds_enhancer` edge/evidence.
 
@@ -34,8 +34,8 @@ Accepted support-only artifacts:
 
 - Keep the existing promoted bounded `features/remap_crm_tf_enhancer_support.parquet` as a `crm_aggregated_support` feature/QA sidecar; it was not overwritten by the full sidecar promotion.
 - Historical fresh-UDC continuation policy and templates from `t_a2674d49` are retained for reproducibility only. They are retired from the active control plane and must not be invoked by preflight, supervisor, health, recovery, cron, or automatic dispatch logic.
-- Treat `features/remap_crm_tf_enhancer_support_full/` as shard-aware support-only feature/QA material, not graph topology and not a replacement for `tf_binds_enhancer` edge/evidence promotion.
-- `t_6c07d9c8` — shard-aware read-only helper added at `manage_db/remap_crm_support_reader.py` with fixture tests in `tests/test_remap_crm_support_reader.py`. Use it to list the 24 canonical shards, read bounded TF/enhancer samples from one chromosome, read `tf_global_summary.parquet`, and run bounded endpoint checks over loaded samples. Live FUSE readback report: `artifacts/reports/t_6c07d9c8_remap_crm_support_reader_live_readback.json`. Semantics remain support-only feature/QA material, not edge/evidence/observed binding/inferred topology.
+- Treat the compact `features/remap_crm_tf_enhancer_support.parquet` object as support-only feature/QA material, not graph topology and not a replacement for `tf_binds_enhancer` edge/evidence promotion.
+- `manage_db/remap_crm_support_reader.py` reads the compact canonical object directly with streamed batches and bounded result limits. It can filter enhancer-bearing rows by chromosome, query TF/support fields, and run bounded endpoint checks over loaded samples. Semantics remain support-only feature/QA material, not edge/evidence/observed binding/inferred topology.
 - `t_a405fe3b` / reviewer `t_95856c15` — bounded first80 chr1 CRM/peak `tf_binds_enhancer` edge/evidence pilot is `pilot accepted` / `staged-only` with 1,224,536 edges and 6,356,561 evidence rows. It is not canonical/full production.
 - `t_f8cc9e4b` — full/unbounded CRM/peak edge/evidence scaling is a validated feasibility/policy gate. Existing accepted full CRM lineage `t_5968ce32` reports 24,453,482,386 TF × CRM × enhancer candidate support rows intentionally not materialized; converting it into active `tf_binds_enhancer` edges/evidence would require either reviewed aggregate-reduction semantics or explicit external large-product materialization approval. See `docs/remap_crm_tf_binds_enhancer_full_feasibility_t_f8cc9e4b.md` and `artifacts/reports/t_f8cc9e4b_feasibility_gate.json`.
 - `t_2e1b271a` — CTO decision: choose route C for now. Full ReMap CRM stays `support-only` / feature-QA material until a stricter reduction policy exists; do not create full edge/evidence build work, do not silently aggregate the sidecar into graph topology, and do not claim canonical `tf_binds_enhancer` edge/evidence promotion. Decision doc: `docs/remap_crm_tf_binds_enhancer_next_decision_t_2e1b271a.md`.

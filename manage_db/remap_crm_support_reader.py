@@ -1,20 +1,17 @@
 from __future__ import annotations
 
-"""Shard-aware readers for the canonical full ReMap CRM support sidecar.
+"""Bounded readers for the canonical compact ReMap CRM support sidecar.
 
-The promoted full sidecar is support-only feature/QA material under
-``features/remap_crm_tf_enhancer_support_full/``.  It is deliberately not graph
+The promoted sidecar is the single compact Parquet
+``features/remap_crm_tf_enhancer_support.parquet``. It is deliberately not graph
 topology: not ``edges/tf_binds_enhancer.parquet``, not evidence, not observed
-binding, and not inferred edges.  These helpers keep reads chromosome-sharded and
-bounded so downstream users do not need, or accidentally create, a monolithic
-Parquet.
+binding, and not inferred edges. These helpers stream row batches and keep query
+results bounded rather than loading the 48,768,788-row object into memory.
 """
 
 import argparse
-import glob
 import json
 import os
-import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Sequence
@@ -23,9 +20,8 @@ import fsspec
 import pandas as pd
 import pyarrow.parquet as pq
 
-DEFAULT_KG_ROOT = os.environ.get("JOUVENCE_KG_ROOT", "/Users/jkobject/mnt/gcs/jouvencekb-kg/v2")
-DEFAULT_GCS_PREFIX = "gs://jouvencekb/kg/v2/features/remap_crm_tf_enhancer_support_full"
-DEFAULT_FUSE_PREFIX = str(Path(DEFAULT_KG_ROOT) / "features" / "remap_crm_tf_enhancer_support_full")
+DEFAULT_KG_ROOT = os.environ.get("JOUVENCE_KG_ROOT", "gs://jouvencekb/main")
+DEFAULT_GCS_PATH = "gs://jouvencekb/main/features/remap_crm_tf_enhancer_support.parquet"
 CHROMOSOME_ORDER = [str(i) for i in range(1, 23)] + ["X", "Y"]
 SUMMARY_COLUMNS = [
     "feature_table",
@@ -72,11 +68,9 @@ class SidecarLocation:
 
 
 def default_prefix() -> str:
-    """Return the healthy local FUSE prefix when present, otherwise the GCS URI."""
+    """Return the direct canonical GCS object unless explicitly overridden."""
 
-    if Path(DEFAULT_FUSE_PREFIX).exists():
-        return DEFAULT_FUSE_PREFIX
-    return DEFAULT_GCS_PREFIX
+    return DEFAULT_GCS_PATH
 
 
 def _strip_slash(value: str | Path) -> str:
@@ -99,17 +93,17 @@ def _exists(path: str) -> bool:
     return Path(path).exists()
 
 
-def _glob(path: str) -> list[str]:
-    if _is_cloud_uri(path):
-        fs, fs_path = _url_to_fs(path)
-        return sorted(fs.glob(fs_path))
-    return sorted(glob.glob(path))
-
-
 def _format_path(prefix: str, name: str) -> str:
     prefix = _strip_slash(prefix)
     sep = "/"
     return f"{prefix}{sep}{name}"
+
+
+def _sidecar_path(value: str | Path | None = None) -> str:
+    resolved = _strip_slash(value or default_prefix())
+    if resolved.endswith(".parquet"):
+        return resolved
+    return _format_path(resolved, "features/remap_crm_tf_enhancer_support.parquet")
 
 
 def _apply_filters(df: pd.DataFrame, filters) -> pd.DataFrame:
@@ -188,37 +182,42 @@ def _normalise_chromosome(chromosome: str | int) -> str:
 
 
 def chromosome_shard_path(chromosome: str | int, *, prefix: str | Path | None = None) -> str:
-    """Return the path/URI for one chromosome summary shard."""
+    """Return the compact object path after validating a chromosome selector."""
 
-    chrom = _normalise_chromosome(chromosome)
-    return _format_path(_strip_slash(prefix or default_prefix()), f"summary_chr{chrom}.parquet")
+    _normalise_chromosome(chromosome)
+    return _sidecar_path(prefix)
 
 
 def tf_global_summary_path(*, prefix: str | Path | None = None) -> str:
-    """Return the path/URI for ``tf_global_summary.parquet``."""
+    """Return the compact object used for bounded TF-summary queries."""
 
-    return _format_path(_strip_slash(prefix or default_prefix()), "tf_global_summary.parquet")
+    return _sidecar_path(prefix)
 
 
 def list_chromosomes(*, prefix: str | Path | None = None) -> list[str]:
-    """List available chromosome shards without reading their contents."""
+    """Stream the chromosome column and list values present in the compact file."""
 
-    root = _strip_slash(prefix or default_prefix())
-    matches = _glob(_format_path(root, "summary_chr*.parquet"))
+    path = _sidecar_path(prefix)
+    if not _exists(path):
+        raise FileNotFoundError(f"Parquet not found: {path}")
+    if _is_cloud_uri(path):
+        fs, fs_path = _url_to_fs(path)
+        parquet_file = pq.ParquetFile(fs.open(fs_path, "rb"))
+    else:
+        parquet_file = pq.ParquetFile(path)
     chroms: set[str] = set()
-    for match in matches:
-        name = Path(str(match)).name
-        found = re.fullmatch(r"summary_chr(.+)\.parquet", name)
-        if found:
-            chroms.add(found.group(1))
+    for batch in parquet_file.iter_batches(columns=["enhancer_chromosome"], batch_size=65536):
+        for value in batch.column(0).to_pylist():
+            if value is not None:
+                chroms.add(str(value).removeprefix("chr").removeprefix("CHR"))
     return [chrom for chrom in CHROMOSOME_ORDER if chrom in chroms]
 
 
 def location_status(*, prefix: str | Path | None = None) -> SidecarLocation:
-    """Return the prefix selected for reads and whether it is local/FUSE or cloud."""
+    """Return the selected compact object and whether it is local or cloud."""
 
-    resolved = _strip_slash(prefix or default_prefix())
-    source = "gcs" if _is_cloud_uri(resolved) else "local_or_fuse"
+    resolved = _sidecar_path(prefix)
+    source = "gcs" if _is_cloud_uri(resolved) else "local_cache"
     return SidecarLocation(prefix=resolved, source=source)
 
 
@@ -250,32 +249,41 @@ def read_chromosome_support(
     enhancer_id: str | None = None,
     support_entity_type: str | None = None,
     columns: Sequence[str] | None = None,
-    limit: int | None = None,
+    limit: int | None = 20,
 ) -> pd.DataFrame:
-    """Read one chromosome shard with optional TF/enhancer filters.
+    """Read bounded rows for one chromosome from the compact sidecar.
 
-    This function never reads all 24 shards.  Use ``limit`` during exploration;
-    omit it only when a full single-chromosome read is intentional.
+    Rows without ``enhancer_chromosome`` (including old per-shard TF rollups)
+    cannot be assigned to a chromosome after compaction and are not returned.
     """
 
+    if limit is None:
+        raise ValueError("a bounded limit is required for compact sidecar reads")
+    chrom = _normalise_chromosome(chromosome)
     path = chromosome_shard_path(chromosome, prefix=prefix)
     wanted_columns = list(columns) if columns is not None else None
-    filter_columns = ["tf_gene_id", "tf_symbol_sample", "enhancer_id", "support_entity_type"]
+    filters = [
+        ("enhancer_chromosome", "==", chrom),
+        *(
+            _summary_filters(
+                tf_gene_id=tf_gene_id,
+                tf_symbol=tf_symbol,
+                enhancer_id=enhancer_id,
+                support_entity_type=support_entity_type,
+            )
+            or []
+        ),
+    ]
     if wanted_columns is not None:
         # PyArrow needs filtered columns present in the scan even if the caller
         # does not want them in the final output.
-        for col in filter_columns:
+        for col, _, _ in filters:
             if col not in wanted_columns:
                 wanted_columns.append(col)
     df = _read_parquet(
         path,
         columns=wanted_columns,
-        filters=_summary_filters(
-            tf_gene_id=tf_gene_id,
-            tf_symbol=tf_symbol,
-            enhancer_id=enhancer_id,
-            support_entity_type=support_entity_type,
-        ),
+        filters=filters,
         limit=limit,
     )
     if columns is not None:
@@ -289,11 +297,13 @@ def read_tf_global_summary(
     tf_gene_id: str | None = None,
     tf_symbol: str | None = None,
     columns: Sequence[str] | None = None,
-    limit: int | None = None,
+    limit: int | None = 20,
 ) -> pd.DataFrame:
-    """Read the small global TF summary table, optionally filtered."""
+    """Read bounded TF aggregate rows from the compact sidecar."""
 
-    filters: list[tuple[str, str, object]] = []
+    if limit is None:
+        raise ValueError("a bounded limit is required for compact sidecar reads")
+    filters: list[tuple[str, str, object]] = [("support_entity_type", "==", "tf")]
     if tf_gene_id:
         filters.append(("tf_gene_id", "==", tf_gene_id))
     if tf_symbol:
@@ -303,7 +313,7 @@ def read_tf_global_summary(
         # Manual bounded reads apply filters after reading batches, so filter
         # columns must be present internally even when callers request a
         # narrower output projection.
-        for col in ("tf_gene_id", "tf_symbol_sample"):
+        for col in ("support_entity_type", "tf_gene_id", "tf_symbol_sample"):
             if col not in wanted_columns:
                 wanted_columns.append(col)
     df = _read_parquet(tf_global_summary_path(prefix=prefix), columns=wanted_columns, filters=filters or None, limit=limit)
@@ -389,18 +399,18 @@ def _parse_columns(value: str | None) -> list[str] | None:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Shard-aware read-only queries for the canonical ReMap CRM full support sidecar"
+        description="Bounded read-only queries for the canonical compact ReMap CRM support sidecar"
     )
     parser.add_argument(
         "--prefix",
         default=None,
-        help=f"Sidecar prefix (default: FUSE if healthy, else {DEFAULT_GCS_PREFIX})",
+        help=f"Compact sidecar Parquet or KG root (default: {DEFAULT_GCS_PATH})",
     )
     parser.add_argument("--kg-root", default=DEFAULT_KG_ROOT, help="Canonical KG root for bounded endpoint checks")
     sub = parser.add_subparsers(dest="command", required=True)
 
     sub.add_parser("status", help="Show selected prefix and support-only semantics")
-    sub.add_parser("list-chromosomes", help="List available summary_chr*.parquet shards")
+    sub.add_parser("list-chromosomes", help="Stream and list chromosomes present in the compact sidecar")
 
     chrom = sub.add_parser("read-chromosome", help="Read one chromosome shard with optional filters")
     chrom.add_argument("--chromosome", required=True, help="Chromosome shard, e.g. 1, chr1, X")
@@ -412,7 +422,7 @@ def build_parser() -> argparse.ArgumentParser:
     chrom.add_argument("--limit", type=int, default=20)
     chrom.add_argument("--format", choices=["table", "tsv", "json", "jsonl"], default="table")
 
-    summary = sub.add_parser("tf-global-summary", help="Read tf_global_summary.parquet")
+    summary = sub.add_parser("tf-global-summary", help="Read bounded TF aggregate rows from the compact sidecar")
     summary.add_argument("--tf-gene-id")
     summary.add_argument("--tf-symbol")
     summary.add_argument("--columns", help="Comma-separated output columns")
