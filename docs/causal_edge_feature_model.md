@@ -135,7 +135,9 @@ GCS, FUSE, LaminDB, or canonical data.
 | UniProt disease | `disease_associated_protein` | 3,243 edges; 35,839 evidence assertions | Category-to-mechanism/direction normalization remains review-required. |
 | Transcript consequence | `mutation_affects_transcript` | 2,599,922 rows | Consequence class alone does not establish LoF or GoF. |
 | Contained gene | `mutation_in_gene` | 2,599,525 rows | Structural containment supplies no C2 eligibility, sign, direction, or mechanism. |
-| Legacy contraindication | `molecule_contraindicates_disease` | 30,675 distinct pairs; 0 evidence assertions | Provenance-free pairs cannot support signed inference or anti-join completeness. |
+| Legacy contraindication | `molecule_contraindicates_disease` | 30,675 distinct pairs; 0 evidence assertions | Provenance-free pairs cannot support signed inference or anti-join completeness; exact missing lineage is tracked in `relation-provenance-and-gaps.md`. |
+
+PR #44 subsequently established a recoverable source-backed canonical `disease_associated_protein` lane with 3,243 edges and 35,839 evidence rows in the flat `main` layout. Its scientific limitation is unchanged: 1 edge has known mechanism and none of the 701 joined paths has known disease mechanism.
 
 The JSON companion fixes these values as one authoritative contract. It also
 records the remaining unknowns instead of presenting absent source normalization

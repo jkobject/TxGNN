@@ -36,6 +36,13 @@ FLAT_PREFIXES = (
 )
 SKIP_SUFFIXES = (".bak_20260618_ot",)
 SCHEMA_HASH_VERSION = "arrow-fields-v1"
+RELATION_PROVENANCE_GAPS = {
+    "molecule_associated_phenotype",
+    "molecule_contraindicates_disease",
+    "molecule_parent_of_molecule",
+    "molecule_synergizes_molecule",
+    "molecule_treats_disease",
+}
 
 SPECIAL_DOCS = {
     "clinical_trials": "../inventory.json",
@@ -293,6 +300,8 @@ def _uri_pattern(objects: list[dict[str, Any]]) -> str:
 
 
 def _provenance(layer: str, name: str, uri: str) -> dict[str, str]:
+    if layer == "edges" and name in RELATION_PROVENANCE_GAPS:
+        return {"source": "TxData/TxGNN legacy bundle; exact accepted constituent source remains a documented provenance gap", "release": "TxData Dataverse DOI 10.7910/DVN/CNQV69; exact accepted constituent release is unresolved", "license": "Not derivable from the edge object; verify the recovered constituent source before redistribution", "provenance": "../../relation-provenance-and-gaps.md"}
     if "clinical_trials_gov" in uri:
         return {"source": "ClinicalTrials.gov API v2 with OpenTargets treatment links where applicable", "release": "See row-level/source manifest metadata", "license": "See canonical source/license report; downstream redistribution remains subject to source review", "provenance": SPECIAL_DOCS["clinical_trials"]}
     if "remap_crm" in uri:
@@ -385,6 +394,8 @@ def _md_escape(text: Any) -> str:
 def _page(dataset: dict[str, Any]) -> str:
     sem = dataset["semantics"]
     prov = dataset["source_release_license_provenance"]
+    if dataset["layer"] == "edges" and dataset["name"] in RELATION_PROVENANCE_GAPS:
+        prov = _provenance(dataset["layer"], dataset["name"], dataset["uri"])
     fields = dataset["fields"]
     uri = dataset["uri"]
     access_uri = uri.replace("summary_chr{1..22,X,Y}.parquet", "summary_chr*.parquet")

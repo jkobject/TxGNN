@@ -40,6 +40,13 @@ Counts:
 
 - `t_cf77187d` — relation backlog/fanout: `design done`.
 - `docs/relation_backlog_prioritized.md` exists.
+- `t_15d71ef0` — legacy relation provenance reconciliation: `review-required` documentation. `molecule_associated_phenotype`, `molecule_contraindicates_disease`, `molecule_parent_of_molecule`, `molecule_synergizes_molecule`, and the original edge lineage of `molecule_treats_disease` remain `provenance-gap`; see `docs/relation-provenance-and-gaps.md` for exact missing traces and bounded next actions.
+
+## Reconciled legacy relation lanes
+
+- PR #44 (`443cbc91d30f6fef4f88622d9c8092f32412174a`) documents the source-backed canonical `disease_associated_protein` edge/evidence lane now present at `main/{edges,evidence}/`; old `kg/v2` receipts are historical only. Mechanism coverage remains 1 / 3,243 edges and 0 / 701 joined paths.
+- PR #15 (`3d65b66e15df03abb8c08e08de6e127134d31bcc`) is a historical PRISM 20Q2 builder reference only. `cell_line_responds_to_molecule` is non-canonical, the old staging was deleted, and no current immutable candidate exists. A future reprise starts from the five checksum-pinned Figshare files and a fresh task-local staged build.
+- PR #41 remains a valid fail-closed zero-row result: 24 templates, 701 paths, 377 with known action, 596 with known disease direction, 0 with known disease mechanism, therefore 0 inferred edge/evidence rows and no placeholder Parquet.
 
 ## Mutation-specific path
 

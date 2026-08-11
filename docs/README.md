@@ -25,6 +25,7 @@ This directory is the single home for durable project knowledge. Start at the re
 
 - [`kg_schema_overview.md`](kg_schema_overview.md) — dated schema and relation inventory.
 - [`relation_coverage_current.md`](relation_coverage_current.md) — dated per-relation coverage mirror.
+- [`relation-provenance-and-gaps.md`](relation-provenance-and-gaps.md) — durable provenance contract for five legacy molecule relation gaps plus reconciled PR #44, PR #15, and PR #41 relation work.
 - [`evidence_and_edge_schema_plan.md`](evidence_and_edge_schema_plan.md) — assertion/evidence separation.
 - [`source_native_expansion_policy.md`](source_native_expansion_policy.md) — source and endpoint policy.
 - [`source_measure_edge_matrix.md`](source_measure_edge_matrix.md) — source/measurement/relation decisions.

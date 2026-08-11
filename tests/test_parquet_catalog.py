@@ -137,6 +137,20 @@ def test_generated_key_claims_are_truthful_and_evidence_uses_edge_linkage() -> N
     assert all("(relation, x_id, y_id)" in text or "edge_key" in text for text in evidence)
 
 
+def test_legacy_relation_catalog_pages_link_the_provenance_gap_contract() -> None:
+    names = {
+        "molecule_associated_phenotype",
+        "molecule_contraindicates_disease",
+        "molecule_parent_of_molecule",
+        "molecule_synergizes_molecule",
+        "molecule_treats_disease",
+    }
+    for name in names:
+        text = (REPO_ROOT / CATALOG_DIR / "datasets" / f"edges__{name}.md").read_text()
+        assert "exact accepted constituent source remains a documented provenance gap" in text
+        assert "../../relation-provenance-and-gaps.md" in text
+
+
 def test_read_examples_are_dataset_scoped_and_planned_pages_are_non_executable() -> None:
     pages = (REPO_ROOT / CATALOG_DIR / "datasets").glob("*.md")
     for path in pages:

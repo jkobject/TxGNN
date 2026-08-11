@@ -303,6 +303,13 @@ OPEN_TARGETS_PREFIXES = (
     "disease_associated_", "disease_involves_", "disease_manifests_",
     "enhancer_regulates_", "gene_interacts_", "mutation_", "molecule_targets_",
 )
+RELATION_PROVENANCE_GAP_IDS = {
+    "edges__molecule_associated_phenotype",
+    "edges__molecule_contraindicates_disease",
+    "edges__molecule_parent_of_molecule",
+    "edges__molecule_synergizes_molecule",
+    "edges__molecule_treats_disease",
+}
 PROVENANCE_GAP_IDS = {
     "nodes__dataset", "nodes__paper", "edges__molecule_associated_phenotype",
     "edges__molecule_contraindicates_disease", "edges__molecule_parent_of_molecule",
@@ -454,6 +461,11 @@ def build_registry() -> dict[str, Any]:
             "docs/storage-migration-20260727/object-map.json",
             *family["links"],
         ]
+        if dataset_id in RELATION_PROVENANCE_GAP_IDS or dataset_id in {
+            "edges__disease_associated_protein",
+            "evidence__disease_associated_protein",
+        }:
+            links.append("docs/relation-provenance-and-gaps.md")
         record = {
             "layer": layer,
             "name": name,
