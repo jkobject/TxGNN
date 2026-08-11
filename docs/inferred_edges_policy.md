@@ -6,7 +6,7 @@ Source of truth used for this policy:
 
 - relation coverage: `docs/relation_coverage_current.md`
 - schema overview: `docs/kg_schema_overview.md`
-- canonical KG FUSE root: `/Users/jkobject/mnt/gcs/jouvencekb-kg/v2`
+- historical audit root: `gs://jouvencekb/kg/v2` (superseded, non-executable history; current canonical root is `gs://jouvencekb/main`)
 - bounded audit prototype: `scripts/audit_inferred_edges_candidates.py`
 - bounded audit output: `artifacts/reports/t_f0ad9dff_inferred_edge_candidates.json`
 
@@ -14,7 +14,7 @@ This document defines candidate-generation policy only. It does **not** authoriz
 
 ## Core distinction: observed vs inferred
 
-Canonical observed edges are graph assertions supported by a source-native relation or by an already accepted canonical builder policy. They live under `v2/edges/{relation}.parquet`; when source provenance exists, support lives under `v2/evidence/{relation}.parquet`.
+Canonical observed edges are graph assertions supported by a source-native relation or by an already accepted canonical builder policy. They live under `main/edges/{relation}.parquet`; when source provenance exists, support lives under `main/evidence/{relation}.parquet`.
 
 Inferred edges are second-order hypotheses generated from existing graph paths. They may be useful for retrieval, prioritization, ablation features, GNN message-passing variants, or candidate review queues, but they are not source-native observations. They must remain separable from canonical observed edges and must carry their derivation path as evidence.
 
@@ -60,8 +60,8 @@ If full edge IDs are not available yet, store deterministic hashes over `(relati
 Preferred storage for build/test:
 
 ```text
-v2/edges_inferred/{relation}/{template_id}.parquet
-v2/evidence_inferred/{relation}/{template_id}.parquet
+main/edges_inferred/{relation}/{template_id}.parquet
+main/evidence_inferred/{relation}/{template_id}.parquet
 ```
 
 or, for staged local work:
@@ -74,8 +74,8 @@ artifacts/staged/<task-id>/evidence_inferred/{relation}/{template_id}.parquet
 Do **not** write inferred rows into:
 
 ```text
-v2/edges/{relation}.parquet
-v2/evidence/{relation}.parquet
+main/edges/{relation}.parquet
+main/evidence/{relation}.parquet
 ```
 
 until there is an explicit, reviewed canonical-ingestion policy proving the rows are source-backed observed assertions rather than graph-derived hypotheses. Even if such a policy exists later, preserve inferred lineage separately so GNN experiments can exclude or include inferred links intentionally.
@@ -168,7 +168,7 @@ Evidence requirements:
 Bounded audit result (`100,000` mutation anchors):
 
 - raw distinct candidate protein-disease pairs: `741`
-- current canonical `v2/edges` has no `disease_associated_protein.parquet`; relation is staged-only/deferred in coverage docs.
+- the original bounded audit predated canonical `disease_associated_protein`; the current flat layout now contains 3,243 observed edges and 35,839 evidence rows documented from PR #44.
 - top sampled candidates include `ENSP00000367064 -> Orphanet:35858` with `1,032` supporting mutations.
 
 Recommendation:
@@ -361,7 +361,7 @@ Assign when:
 
 1. Keep a template registry in code/docs with stable IDs, e.g. `mutation_protein_disease_v1`.
 2. For each template, write a DuckDB generator that:
-   - reads only canonical `v2/edges` and approved staged inputs;
+   - reads only canonical `main/edges` and approved task-scoped staged inputs;
    - records KG snapshot/root;
    - records support relations and support counts;
    - anti-joins observed canonical target relation when present;
@@ -373,7 +373,7 @@ Assign when:
    - duplicate check on `(x_id, y_id, relation, template_id)`;
    - leakage report listing target relation and support relations.
 4. Use inferred artifacts only in explicit GNN exports with manifest switches.
-5. Require reviewer acceptance before copying any inferred layer to a durable `v2/edges_inferred/` location.
+5. Require reviewer acceptance before copying any inferred layer to a durable `main/edges_inferred/` location.
 
 ## First family to build/test
 
@@ -390,3 +390,7 @@ Reasons:
 Second choice: Template A, but only with reviewed coding/pathogenic, splice, direct protein-change, colocalized-eQTL, or explicit-L2G attribution. Simple `mutation_in_gene` containment is rejected.
 
 Do not build Template D as edges; keep it as a feature/ranking baseline.
+
+## Formal registry result retained from PR #41
+
+The accepted fail-closed run evaluated 24 templates and materialized 701 joined paths. Of those paths, 377 had known pharmacological action and 596 had known disease direction, but 0 had known disease mechanism. It therefore emitted 0 inferred edge rows and 0 inferred evidence rows and created no placeholder Parquet. This is the correct outcome under the operand contract; it must not be reclassified as a missing build or used to justify relaxing mechanism requirements. See `docs/relation-provenance-and-gaps.md`.

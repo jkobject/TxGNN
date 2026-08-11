@@ -42,10 +42,10 @@ Non-causal molecule-to-phenotype side-effect/rescue association; direction is mo
 
 ## Source, release, license and provenance
 
-- Source: See table `source` columns and linked KG schema
-- Release: Object generation/update date in this catalog; biological source release may be row-level
-- License: Not derivable from Parquet metadata alone; consult source provenance before redistribution
-- Provenance: [../../kg_schema_overview.md](../../kg_schema_overview.md)
+- Source: TxData/TxGNN legacy bundle; exact accepted constituent source remains a documented provenance gap
+- Release: TxData Dataverse DOI 10.7910/DVN/CNQV69; exact accepted constituent release is unresolved
+- License: Not derivable from the edge object; verify the recovered constituent source before redistribution
+- Provenance: [../../relation-provenance-and-gaps.md](../../relation-provenance-and-gaps.md)
 
 ## Layout and checksums
 

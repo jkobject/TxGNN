@@ -11,7 +11,11 @@ import nbformat
 import pytest
 from nbclient import NotebookClient
 
-from reproduce.build_parquet_reproduction_registry import STATUSES, build_registry
+from reproduce.build_parquet_reproduction_registry import (
+    RELATION_PROVENANCE_GAP_IDS,
+    STATUSES,
+    build_registry,
+)
 from reproduce.generate_parquet_reproduction_notebooks import (
     build_family_notebook,
     build_readme,
@@ -203,6 +207,39 @@ def test_records_are_complete_conservative_and_reconcile_catalog_and_receipts() 
         "provenance-gap": 10,
     }
     assert gaps
+
+
+def test_legacy_relation_gaps_cannot_disappear_or_be_marked_replayable_without_proof() -> None:
+    records = {f"{row['layer']}__{row['name']}": row for row in registry()["records"]}
+    assert RELATION_PROVENANCE_GAP_IDS == {
+        "edges__molecule_associated_phenotype",
+        "edges__molecule_contraindicates_disease",
+        "edges__molecule_parent_of_molecule",
+        "edges__molecule_synergizes_molecule",
+        "edges__molecule_treats_disease",
+    }
+    for dataset_id in RELATION_PROVENANCE_GAP_IDS:
+        row = records[dataset_id]
+        assert row["reproducibility_status"] == row["replay_level"] == "provenance-gap"
+        assert row["producer_builder"] is None
+        assert row["full_worker_rebuild_command"] is None
+        assert row["rebuild_command_evidenced"] is False
+        assert "exact accepted source-to-object lineage" in row["provenance_gaps"]
+        assert "docs/relation-provenance-and-gaps.md" in row["links"]
+
+    doc = (ROOT / "docs/relation-provenance-and-gaps.md").read_text()
+    for dataset_id in RELATION_PROVENANCE_GAP_IDS:
+        assert f"`{dataset_id.removeprefix('edges__')}`" in doc
+    for required in (
+        "443cbc91d30f6fef4f88622d9c8092f32412174a",
+        "3d65b66e15df03abb8c08e08de6e127134d31bcc",
+        "31,349",
+        "31,952",
+        "24 templates",
+        "701 joined paths",
+        "0 inferred edge rows",
+    ):
+        assert required in doc
 
 
 def test_tracked_links_and_evidenced_builders_exist() -> None:

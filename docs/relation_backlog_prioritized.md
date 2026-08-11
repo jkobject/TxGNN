@@ -8,7 +8,7 @@ This is an execution plan for relations that are not fully done after REL-AUDIT.
 
 ## Global promotion doctrine
 
-1. Do not invent placeholder Parquets. A relation with no accepted source-backed rows remains absent from canonical `v2/edges` and `v2/evidence`.
+1. Do not invent placeholder Parquets. A relation with no accepted source-backed rows remains absent from canonical `main/edges` and `main/evidence`.
 2. Relation names follow native endpoint and assertion. Evidence-specific predicates, scores, assays, releases, and provenance remain in `evidence/{relation}.parquet` and relation metadata.
 3. Do not project gene/RNA rows into protein relations. Protein relations require direct protein/isoform evidence or direct protein measurement.
 4. Do not derive `tf_regulates_gene`, `tf_binds_enhancer`, `transcript_interacts_protein`, `transcript_interacts_gene`, or `protein_interacts_protein` from canonical broad `gene_interacts_gene` rows.
@@ -18,7 +18,7 @@ This is an execution plan for relations that are not fully done after REL-AUDIT.
    - validate x/y endpoint anti-joins against mounted canonical nodes using DuckDB where scale requires it;
    - validate edges-without-evidence and evidence-without-edge are zero when source provenance exists;
    - run `manage_db.audit_edge_evidence` or equivalent targeted support audit;
-   - write a promotion report under `docs/` and a machine-readable validation report under `.omoc/reports/`;
+   - write a promotion report under `docs/` and a machine-readable validation report under `artifacts/reports/<task-id>/`;
    - update `docs/relation_coverage_current.md` or rerun REL-AUDIT after promotion;
    - reviewer approval before canonical writes are treated as done.
 
@@ -69,7 +69,7 @@ Relations:
 | Relation | Source / current artifact | Endpoint type | Schema status | Evidence policy | Validation requirements | Canonical promotion gate |
 | --- | --- | --- | --- | --- | --- | --- |
 | `cell_line_gene_essentiality` | staged DepMap/Project Score essentiality pilot | `cell_line→gene` | active relation, `staged-only/deferred`, 1,433,992 / 1,433,992 | dependency/essentiality measurement; preserve score/effect/study/threshold in evidence | cell line/gene anti-joins; score/effect distribution sanity; threshold and sign documented | promote when threshold policy is explicit and evidence support is complete |
-| `cell_line_responds_to_molecule` | staged GDSC/PRISM viability pilot | `cell_line→molecule` | active relation, `staged-only/deferred`, 11,040 / 11,713 | direct drug screen response/viability only; preserve study, assay, dose/response/effect where available | cell line/molecule anti-joins; evidence support; response predicate and score direction audited | promote after viability semantics and score direction are accepted |
+| `cell_line_responds_to_molecule` | historical GDSC/PRISM viability lanes; PR #15 PRISM 20Q2 builder is preserved only at exact head `3d65b66e15df03abb8c08e08de6e127134d31bcc` and its old staging was deleted | `cell_line→molecule` | active relation, non-canonical / deferred; no current immutable PRISM 20Q2 candidate | direct drug-screen response/viability only; preserve every qualifying source curve plus study, assay, dose/response/effect | fresh source checksums; exact ACH and unique InChIKey mappings; endpoint/evidence/pooling-context/determinism gates | future reprise requires a newly versioned task-local candidate and review; historical staging is not promotable |
 | `cell_line_expresses_protein` | staged direct cell-line proteomics pilot | `cell_line→protein` | active relation, `staged-only/deferred`, 3,083 / 3,090 | direct proteomics only; no RNA projection | cell line/protein anti-joins; evidence provenance; no mRNA-derived rows | promote only if source is direct protein measurement and missing 7 evidence-edge discrepancy is explained/fixed |
 | `cell_type_found_in_tissue` | staged Cell Ontology/UBERON | `cell_type→tissue` | active relation, `staged-only/deferred`, 958 / 958 | ontology/anatomy mapping evidence, not expression inference | cell type/tissue anti-joins; provenance/source ontology release | may be promoted with Wave D if ontological batch is preferred |
 
@@ -98,13 +98,16 @@ Rationale: valuable for provenance/context and likely technically easy, but lowe
 
 These relations already have canonical edge files. They should not block missing-relation promotion, but they need evidence policy/backfill or a decision to treat them as feature/context.
 
+The five legacy molecule relations tracked in `docs/relation-provenance-and-gaps.md` are not generic evidence-backfill chores. They remain `provenance-gap` until release-pinned native inputs, exact endpoint crosswalk/quarantine policy, original producer identity, and a verified comparison command are reviewed together. A migration receipt or later partial evidence file is not sufficient.
+
 | Relation(s) | Current issue | Priority | Required work |
 | --- | --- | --- | --- |
-| `molecule_synergizes_molecule` | canonical edges exist; staged evidence backfill has 2,672,628 evidence rows | P0 evidence-only | review/promote evidence-only update; verify edge/evidence support and drug-combination effect semantics |
-| `molecule_treats_disease` | canonical edges exist; staged OpenTargets clinical evidence subset has 481 rows | P1 evidence-only | promote positive indication evidence only; do not reuse for contraindications |
+| `molecule_synergizes_molecule` | 2,672,628 canonical edges; no current canonical evidence and no current immutable staged backfill; original screen/threshold/pair-orientation lineage is incomplete | P1 provenance recovery | recover exact combination-screen inputs and semantics, then stage a bounded evidence audit; do not promote from deleted/legacy staging |
+| `molecule_treats_disease` | 14,135 canonical edges retain an incomplete original TxData lineage; 8,285 later canonical support rows do not reconstruct the original edge build | P1 provenance recovery | partition supported/unsupported edge keys and recover the original indication source before any replacement proposal; never reuse positive evidence for contraindications |
 | expression edges: `tissue_expresses_gene`, `cell_type_expresses_gene`, `cell_line_expresses_gene` | canonical edges without evidence file; relation-vs-feature policy still needs confirmation | P1/P2 | decide whether expression remains KG edges or migrates to feature/context; if edges remain, add source/value evidence with thresholds |
-| central dogma / ontology / metadata edges (`gene_has_transcript`, `transcript_encodes_protein`, `pathway_child_of_pathway`, `molecule_in_pathway`, `molecule_parent_of_molecule`, `disease_subtype_of_disease`, `disease_has_phenotype`, `phenotype_subtype_of_phenotype`, `tissue_subtype_of_tissue`, `cell_line_derived_from_tissue`, `organism_has_gene`, `organism_has_tissue`, `dataset_contains_cell_line`, `dataset_contains_tissue`, `gene_associated_phenotype`, `molecule_associated_phenotype`) | canonical edge files lack evidence files | P2 | backfill evidence only where source provenance is available and useful; otherwise document accepted no-evidence exception, never fabricate evidence |
-| `molecule_contraindicates_disease` | canonical edges lack evidence and need contraindication-specific source | P2 source selection | find contraindication-specific source; do not use positive indication rows |
+| central dogma / ontology / metadata edges (`gene_has_transcript`, `transcript_encodes_protein`, `pathway_child_of_pathway`, `molecule_in_pathway`, `disease_subtype_of_disease`, `disease_has_phenotype`, `phenotype_subtype_of_phenotype`, `tissue_subtype_of_tissue`, `cell_line_derived_from_tissue`, `organism_has_gene`, `organism_has_tissue`, `dataset_contains_cell_line`, `dataset_contains_tissue`, `gene_associated_phenotype`) | canonical edge files lack evidence files | P2 | backfill evidence only where source provenance is available and useful; otherwise document accepted no-evidence exception, never fabricate evidence |
+| `molecule_associated_phenotype`, `molecule_parent_of_molecule` | canonical edges lack evidence and exact accepted constituent-source/crosswalk lineage | P2 provenance recovery | recover exact source/release, orientation where applicable, endpoint crosswalk and rejection manifest before deciding rebuild versus documented no-evidence exception |
+| `molecule_contraindicates_disease` | 30,675 canonical pairs lack evidence and a contraindication-specific accepted source | P2 source selection | find or recover a contraindication-specific source; do not use positive clinical indication rows |
 
 ## Wave F — schema-only or source-audit-only relations needing source selection before build
 

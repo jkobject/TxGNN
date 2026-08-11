@@ -1156,7 +1156,8 @@
         "docs/storage-migration-20260727/object-map.json",
         "reproduce/07_opentargets_edges_and_evidence.ipynb",
         "reproduce/26_source_reproduction_index.ipynb",
-        "manage_db/ingest_opentargets.py"
+        "manage_db/ingest_opentargets.py",
+        "docs/relation-provenance-and-gaps.md"
       ],
       "mappings_and_joins": "Normalize release-pinned ENSG/ENST/ENSP, ChEMBL, EFO, HP and variant identifiers; resolve endpoints against canonical typed node tables before accepting assertions.",
       "meaning": "Protein\u2192disease direction for protein-native causal/directed disease association; use only protein-specific evidence.",
@@ -2447,7 +2448,8 @@
         "docs/storage-migration-20260727/object-map.json",
         "reproduce/06_build_core_edges_and_evidence.ipynb",
         "reproduce/26_source_reproduction_index.ipynb",
-        "manage_db/export_kg.py"
+        "manage_db/export_kg.py",
+        "docs/relation-provenance-and-gaps.md"
       ],
       "mappings_and_joins": "Normalize legacy node and endpoint identifiers to the declared Jouvence namespaces while preserving source labels and typed endpoints.",
       "meaning": "Non-causal molecule-to-phenotype side-effect/rescue association; direction is molecule\u2192phenotype",
@@ -2573,7 +2575,8 @@
         "docs/storage-migration-20260727/object-map.json",
         "reproduce/06_build_core_edges_and_evidence.ipynb",
         "reproduce/26_source_reproduction_index.ipynb",
-        "manage_db/export_kg.py"
+        "manage_db/export_kg.py",
+        "docs/relation-provenance-and-gaps.md"
       ],
       "mappings_and_joins": "Normalize legacy node and endpoint identifiers to the declared Jouvence namespaces while preserving source labels and typed endpoints.",
       "meaning": "Contraindication",
@@ -2822,7 +2825,8 @@
         "docs/storage-migration-20260727/object-map.json",
         "reproduce/06_build_core_edges_and_evidence.ipynb",
         "reproduce/26_source_reproduction_index.ipynb",
-        "manage_db/export_kg.py"
+        "manage_db/export_kg.py",
+        "docs/relation-provenance-and-gaps.md"
       ],
       "mappings_and_joins": "Normalize legacy node and endpoint identifiers to the declared Jouvence namespaces while preserving source labels and typed endpoints.",
       "meaning": "Chemical/drug parent-child hierarchy relation.",
@@ -2948,7 +2952,8 @@
         "docs/storage-migration-20260727/object-map.json",
         "reproduce/06_build_core_edges_and_evidence.ipynb",
         "reproduce/26_source_reproduction_index.ipynb",
-        "manage_db/export_kg.py"
+        "manage_db/export_kg.py",
+        "docs/relation-provenance-and-gaps.md"
       ],
       "mappings_and_joins": "Normalize legacy node and endpoint identifiers to the declared Jouvence namespaces while preserving source labels and typed endpoints.",
       "meaning": "Drug combination synergy or interaction-effect relation; not a physical molecular interaction.",
@@ -3203,7 +3208,8 @@
         "docs/storage-migration-20260727/object-map.json",
         "reproduce/06_build_core_edges_and_evidence.ipynb",
         "reproduce/26_source_reproduction_index.ipynb",
-        "manage_db/export_kg.py"
+        "manage_db/export_kg.py",
+        "docs/relation-provenance-and-gaps.md"
       ],
       "mappings_and_joins": "Normalize legacy node and endpoint identifiers to the declared Jouvence namespaces while preserving source labels and typed endpoints.",
       "meaning": "Indication (clinical)",
@@ -9261,7 +9267,8 @@
         "docs/storage-migration-20260727/object-map.json",
         "reproduce/07_opentargets_edges_and_evidence.ipynb",
         "reproduce/26_source_reproduction_index.ipynb",
-        "manage_db/ingest_opentargets.py"
+        "manage_db/ingest_opentargets.py",
+        "docs/relation-provenance-and-gaps.md"
       ],
       "mappings_and_joins": "Normalize release-pinned ENSG/ENST/ENSP, ChEMBL, EFO, HP and variant identifiers; resolve endpoints against canonical typed node tables before accepting assertions.",
       "meaning": "Source-level support records for the canonical `disease_associated_protein` assertion.",

@@ -168,6 +168,8 @@ Cards:
 
 Use `docs/relation_backlog_prioritized.md` and `todo.d/04_relations.md`. A relation is not complete until canonical promoted+reviewed or explicitly accepted as staged/deferred.
 
+- `t_15d71ef0` — relation provenance reconciliation: five canonical legacy molecule relations remain explicitly `provenance-gap`; PR #44 `disease_associated_protein`, PR #15 PRISM 20Q2, and the PR #41 zero-row inferred result are preserved in `docs/relation-provenance-and-gaps.md`. This is documentation/backlog status only and authorizes no rebuild or canonical write.
+
 ### 7. Process hygiene
 
 - `t_caacd3d1` — keep `todo.d/` synced, enforce honest status labels, fix review routing/watchdog behavior, and prevent `.omoc` recreation.
