@@ -51,6 +51,27 @@ def test_every_row_has_closed_source_mapping_execution_fields() -> None:
             assert row[field], f"{relation}: {field}"
 
 
+def test_current_raw_availability_requires_immutable_object_identity() -> None:
+    required = {"uri", "generation", "crc32c_base64", "size"}
+    for relation, row in _rows().items():
+        if "current-raw-available" not in row["availability_statuses"]:
+            continue
+        assert row["raw_objects"], relation
+        assert any(required <= set(obj) for obj in row["raw_objects"]), relation
+
+
+def test_cell_ontology_source_is_refetch_required_and_uberon_is_not_cl() -> None:
+    for relation in ["cell_type_found_in_tissue", "cell_type_subtype_of_cell_type"]:
+        row = _rows()[relation]
+        text = json.dumps(row)
+        assert "current-raw-available" not in row["availability_statuses"]
+        assert "remote-refetch-required" in row["availability_statuses"]
+        assert "releases/2026-06-08" in text
+        assert "CL OBO" in text
+    tissue = _rows()["cell_type_found_in_tissue"]
+    assert tissue["raw_objects"][0]["role"] == "endpoint vocabulary only; not the CL assertion source"
+
+
 def test_remap_is_not_mislabeled_completed_by_crm_sidecar() -> None:
     remap = _rows()["tf_binds_enhancer"]
     text = json.dumps(remap).lower()

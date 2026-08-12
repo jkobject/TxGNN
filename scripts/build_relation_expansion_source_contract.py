@@ -196,10 +196,33 @@ SPECS["cell_line_responds_to_molecule"]["missing_artifacts"].append(
     "historical GCS staging is not restorable: bounded soft-deleted probes matched no objects; refetch exact Figshare files instead"
 )
 
-# Historical ontology/cell-line candidates.
+# Historical ontology/cell-line candidates. The CL assertion payload itself is no
+# longer in current raw storage; the retained UBERON object is only a tissue
+# endpoint vocabulary and must not be mistaken for the missing CL source.
+SPECS["cell_type_found_in_tissue"] = _spec(
+    ["Cell Ontology CL relationship axioms plus UBERON endpoint vocabulary"],
+    ["remote-refetch-required", "historical-builder-recoverable"],
+    release_version="Historical CL source observed locally as releases/2026-06-08; exact refetched payload must be verified before replay.",
+    license_access="Verify CL and UBERON ontology attribution/license metadata for the exact payloads before promotion.",
+    raw_objects=[{"uri":"gs://jouvencekb/raw/uberon_basic.obo","generation":"1785155500137868","crc32c_base64":"iKspOA==","size":12078648,"role":"endpoint vocabulary only; not the CL assertion source"}],
+    historical_identity="t_badd3e1e: 958 edges / 958 evidence from explicit CL part_of/located_in axioms; historical source note records CL releases/2026-06-08.",
+    builder_status="manage_db/build_cell_type_context_relations.py is present; replay is blocked on exact CL refetch/checksum and current flat-path manifest updates",
+    assertion_policy="explicit CL part_of/located_in tissue assertion; UBERON supplies typed tissue endpoints but cannot create the assertion",
+    mapping_rejection_policy="Map CL and UBERON endpoints exactly; preserve predicate; reject missing, obsolete, ambiguous and wrong-type endpoints.",
+    missing_artifacts=["CL OBO releases/2026-06-08 payload (or explicitly reviewed replacement release)", "immutable CL checksum/size/source manifest", "fresh mapping quarantine and replay/parity report"],
+)
+SPECS["cell_type_subtype_of_cell_type"] = _spec(
+    ["Cell Ontology CL is_a hierarchy"],
+    ["remote-refetch-required", "historical-builder-recoverable"],
+    release_version="Historical CL source observed locally as releases/2026-06-08; exact refetched payload must be verified before replay.",
+    license_access="Verify CL ontology attribution/license metadata for the exact payload before promotion.",
+    historical_identity="t_badd3e1e: 4,526 edges / 4,526 evidence from CL is_a; historical source note records CL releases/2026-06-08.",
+    builder_status="manage_db/build_cell_type_context_relations.py is present; replay is blocked on exact CL refetch/checksum and current flat-path manifest updates",
+    assertion_policy="explicit CL is_a hierarchy",
+    mapping_rejection_policy="Map CL endpoints exactly; preserve is_a; reject missing, obsolete, ambiguous and wrong-type endpoints.",
+    missing_artifacts=["CL OBO releases/2026-06-08 payload (or explicitly reviewed replacement release)", "immutable CL checksum/size/source manifest", "fresh mapping quarantine and replay/parity report"],
+)
 for relation, source, identity, raw, policy in [
-    ("cell_type_found_in_tissue", "Cell Ontology CL relationship axioms plus UBERON", "t_badd3e1e: 958 edges / 958 evidence", [], "explicit CL part_of/located_in tissue assertion"),
-    ("cell_type_subtype_of_cell_type", "Cell Ontology CL is_a hierarchy", "t_badd3e1e: 4,526 / 4,526", [], "explicit CL is_a hierarchy"),
     ("cell_line_models_disease", "Cellosaurus disease annotations", "historical validated candidate: 983 edges / 1,218 evidence", [{"uri":"gs://jouvencekb/raw/cellosaurus_20260623.txt","generation":"1785155500485969","crc32c_base64":"STFRNQ==","size":119996997}], "source-native Cellosaurus cell-line disease annotation"),
     ("cell_line_derived_from_cell_type", "Cellosaurus cell-type annotations", "historical validated candidate: 65 / 65", [{"uri":"gs://jouvencekb/raw/cellosaurus_20260623.obo","generation":"1785155500649684","crc32c_base64":"coX5Eg==","size":116572609}], "source-native Cellosaurus cell-type derivation annotation"),
 ]:

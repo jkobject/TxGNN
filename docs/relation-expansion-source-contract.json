@@ -355,12 +355,12 @@
       "y_type": "protein"
     },
     {
-      "assertion_policy": "explicit CL part_of/located_in tissue assertion",
+      "assertion_policy": "explicit CL part_of/located_in tissue assertion; UBERON supplies typed tissue endpoints but cannot create the assertion",
       "availability_statuses": [
-        "current-raw-available",
+        "remote-refetch-required",
         "historical-builder-recoverable"
       ],
-      "builder_status": "historical/current builder lineage recoverable; update paths and manifest checks",
+      "builder_status": "manage_db/build_cell_type_context_relations.py is present; replay is blocked on exact CL refetch/checksum and current flat-path manifest updates",
       "direct": true,
       "evidence_fields": [
         "source",
@@ -373,18 +373,30 @@
         "license"
       ],
       "execution_placement": "bounded fixture/source audit on Mac; full or bulk build on txgnn-worker; task-scoped staging only",
-      "historical_identity": "t_badd3e1e: 958 edges / 958 evidence",
+      "historical_identity": "t_badd3e1e: 958 edges / 958 evidence from explicit CL part_of/located_in axioms; historical source note records CL releases/2026-06-08.",
       "kind": "ontological",
-      "license_access": "Verify ontology/source redistribution terms before promotion.",
-      "mapping_rejection_policy": "Map source-native typed endpoints exactly; preserve predicate; reject missing, obsolete, ambiguous and wrong-type endpoints.",
-      "missing_artifacts": [],
+      "license_access": "Verify CL and UBERON ontology attribution/license metadata for the exact payloads before promotion.",
+      "mapping_rejection_policy": "Map CL and UBERON endpoints exactly; preserve predicate; reject missing, obsolete, ambiguous and wrong-type endpoints.",
+      "missing_artifacts": [
+        "CL OBO releases/2026-06-08 payload (or explicitly reviewed replacement release)",
+        "immutable CL checksum/size/source manifest",
+        "fresh mapping quarantine and replay/parity report"
+      ],
       "next_rebuild_card": "create a relation-specific producer card after this contract is reviewed and merged",
       "preferred_sources": [
-        "Cell Ontology CL relationship axioms plus UBERON"
+        "Cell Ontology CL relationship axioms plus UBERON endpoint vocabulary"
       ],
-      "raw_objects": [],
+      "raw_objects": [
+        {
+          "crc32c_base64": "iKspOA==",
+          "generation": "1785155500137868",
+          "role": "endpoint vocabulary only; not the CL assertion source",
+          "size": 12078648,
+          "uri": "gs://jouvencekb/raw/uberon_basic.obo"
+        }
+      ],
       "relation": "cell_type_found_in_tissue",
-      "release_version": "2026-06-23 historical source snapshot",
+      "release_version": "Historical CL source observed locally as releases/2026-06-08; exact refetched payload must be verified before replay.",
       "x_type": "cell_type",
       "y_type": "tissue"
     },
@@ -475,10 +487,10 @@
     {
       "assertion_policy": "explicit CL is_a hierarchy",
       "availability_statuses": [
-        "current-raw-available",
+        "remote-refetch-required",
         "historical-builder-recoverable"
       ],
-      "builder_status": "historical/current builder lineage recoverable; update paths and manifest checks",
+      "builder_status": "manage_db/build_cell_type_context_relations.py is present; replay is blocked on exact CL refetch/checksum and current flat-path manifest updates",
       "direct": true,
       "evidence_fields": [
         "source",
@@ -491,18 +503,22 @@
         "license"
       ],
       "execution_placement": "bounded fixture/source audit on Mac; full or bulk build on txgnn-worker; task-scoped staging only",
-      "historical_identity": "t_badd3e1e: 4,526 / 4,526",
+      "historical_identity": "t_badd3e1e: 4,526 edges / 4,526 evidence from CL is_a; historical source note records CL releases/2026-06-08.",
       "kind": "ontological",
-      "license_access": "Verify ontology/source redistribution terms before promotion.",
-      "mapping_rejection_policy": "Map source-native typed endpoints exactly; preserve predicate; reject missing, obsolete, ambiguous and wrong-type endpoints.",
-      "missing_artifacts": [],
+      "license_access": "Verify CL ontology attribution/license metadata for the exact payload before promotion.",
+      "mapping_rejection_policy": "Map CL endpoints exactly; preserve is_a; reject missing, obsolete, ambiguous and wrong-type endpoints.",
+      "missing_artifacts": [
+        "CL OBO releases/2026-06-08 payload (or explicitly reviewed replacement release)",
+        "immutable CL checksum/size/source manifest",
+        "fresh mapping quarantine and replay/parity report"
+      ],
       "next_rebuild_card": "create a relation-specific producer card after this contract is reviewed and merged",
       "preferred_sources": [
         "Cell Ontology CL is_a hierarchy"
       ],
       "raw_objects": [],
       "relation": "cell_type_subtype_of_cell_type",
-      "release_version": "2026-06-23 historical source snapshot",
+      "release_version": "Historical CL source observed locally as releases/2026-06-08; exact refetched payload must be verified before replay.",
       "x_type": "cell_type",
       "y_type": "cell_type"
     },
