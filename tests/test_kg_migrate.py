@@ -72,6 +72,31 @@ def test_migrate_edges_canonicalizes_bidirectional_txdata_relations() -> None:
     assert set(migrated_edges["y_id"]) == {migrated_nodes[migrated_nodes["node_type"] == "disease"].iloc[0]["id"]}
 
 
+def test_migrate_edges_uses_parent_predicate_for_exposure_hierarchy() -> None:
+    nodes = pd.DataFrame(
+        [
+            {"node_index": 1, "node_id": "D006539", "node_type": "exposure", "node_name": "parent", "node_source": "CTD"},
+            {"node_index": 2, "node_id": "D006540", "node_type": "exposure", "node_name": "child", "node_source": "CTD"},
+        ]
+    )
+    _, index_to_id = migrate_nodes(nodes)
+    edges = pd.DataFrame(
+        [
+            {
+                "x_index": 1,
+                "y_index": 2,
+                "relation": "exposure_exposure",
+                "display_relation": "parent of",
+            }
+        ]
+    )
+
+    migrated, unmapped = migrate_edges(edges, nodes, index_to_id)
+
+    assert unmapped == []
+    assert migrated["relation"].tolist() == ["molecule_parent_of_molecule"]
+
+
 def test_load_gene_id_map_whitelists_only_two_accepted_statuses(tmp_path) -> None:
     path = tmp_path / "map.csv"
     pd.DataFrame(

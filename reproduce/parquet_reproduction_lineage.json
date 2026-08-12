@@ -606,7 +606,8 @@
         "docs/storage-migration-20260727/object-map.json",
         "reproduce/06_build_core_edges_and_evidence.ipynb",
         "reproduce/26_source_reproduction_index.ipynb",
-        "manage_db/export_kg.py"
+        "reproduce/30_molecule_provenance_gap_rebuild.ipynb",
+        "manage_db/rebuild_molecule_provenance_gaps.py"
       ],
       "mappings_and_joins": "Normalize legacy node and endpoint identifiers to the declared Jouvence namespaces while preserving source labels and typed endpoints.",
       "meaning": "scRNA-seq (CellxGene)",
@@ -620,14 +621,14 @@
       },
       "name": "cell_type_expresses_gene",
       "native_inputs": [
-        "https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/CNQV69"
+        "https://dataverse.harvard.edu/api/access/datafile/7144484"
       ],
       "native_source": [
-        "https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/CNQV69"
+        "https://dataverse.harvard.edu/api/access/datafile/7144484"
       ],
       "non_meaning": "It is not evidence multiplicity: source-specific support belongs in the matching evidence table.",
       "pipeline_family": "txgnn_legacy",
-      "problems_and_decisions": "The immutable Dataverse identity is known, but the complete accepted acquisition/build argv and several constituent source releases are not tracked.",
+      "problems_and_decisions": "The five molecule lineages now have an immutable flattened-source builder and exact TxGNN file identity; they remain provenance-gap until full parity/exception evidence and independent review. Other legacy family outputs retain historical-only lineage.",
       "producer": null,
       "producer_builder": null,
       "provenance_gaps": [
@@ -647,7 +648,7 @@
       },
       "quarantines_exclusions_missing": "Do not infer missing evidence, source releases or endpoint projections from a legacy relation name.",
       "rebuild_command_evidenced": false,
-      "release": "TxData Dataverse DOI 10.7910/DVN/CNQV69; constituent upstream releases vary and are not always recoverable",
+      "release": "TxGNN/DeepPurpose Dataverse v6.0 kg.csv, file 7144484, published 2023-06-07, MD5 aac8191d4fbc5bf09cdf8c3c78b4e75f; constituent upstream releases are not encoded",
       "replay_level": "historical-builder-only",
       "reproduce_notebook": "notebooks/reproduce/txgnn_legacy_bundle.ipynb",
       "reproducibility_limits": "This notebook documents and checks current artifact identity. It does not prove that historical native inputs can recreate identical biological rows unless the status and evidence explicitly establish that stronger claim.",
@@ -853,7 +854,8 @@
         "docs/storage-migration-20260727/object-map.json",
         "reproduce/06_build_core_edges_and_evidence.ipynb",
         "reproduce/26_source_reproduction_index.ipynb",
-        "manage_db/export_kg.py"
+        "reproduce/30_molecule_provenance_gap_rebuild.ipynb",
+        "manage_db/rebuild_molecule_provenance_gaps.py"
       ],
       "mappings_and_joins": "Normalize legacy node and endpoint identifiers to the declared Jouvence namespaces while preserving source labels and typed endpoints.",
       "meaning": "Measured entity",
@@ -867,14 +869,14 @@
       },
       "name": "dataset_contains_tissue",
       "native_inputs": [
-        "https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/CNQV69"
+        "https://dataverse.harvard.edu/api/access/datafile/7144484"
       ],
       "native_source": [
-        "https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/CNQV69"
+        "https://dataverse.harvard.edu/api/access/datafile/7144484"
       ],
       "non_meaning": "It is not evidence multiplicity: source-specific support belongs in the matching evidence table.",
       "pipeline_family": "txgnn_legacy",
-      "problems_and_decisions": "The immutable Dataverse identity is known, but the complete accepted acquisition/build argv and several constituent source releases are not tracked.",
+      "problems_and_decisions": "The five molecule lineages now have an immutable flattened-source builder and exact TxGNN file identity; they remain provenance-gap until full parity/exception evidence and independent review. Other legacy family outputs retain historical-only lineage.",
       "producer": null,
       "producer_builder": null,
       "provenance_gaps": [
@@ -894,7 +896,7 @@
       },
       "quarantines_exclusions_missing": "Do not infer missing evidence, source releases or endpoint projections from a legacy relation name.",
       "rebuild_command_evidenced": false,
-      "release": "TxData Dataverse DOI 10.7910/DVN/CNQV69; constituent upstream releases vary and are not always recoverable",
+      "release": "TxGNN/DeepPurpose Dataverse v6.0 kg.csv, file 7144484, published 2023-06-07, MD5 aac8191d4fbc5bf09cdf8c3c78b4e75f; constituent upstream releases are not encoded",
       "replay_level": "historical-builder-only",
       "reproduce_notebook": "notebooks/reproduce/txgnn_legacy_bundle.ipynb",
       "reproducibility_limits": "This notebook documents and checks current artifact identity. It does not prove that historical native inputs can recreate identical biological rows unless the status and evidence explicitly establish that stronger claim.",
@@ -1663,7 +1665,8 @@
         "docs/storage-migration-20260727/object-map.json",
         "reproduce/06_build_core_edges_and_evidence.ipynb",
         "reproduce/26_source_reproduction_index.ipynb",
-        "manage_db/export_kg.py"
+        "reproduce/30_molecule_provenance_gap_rebuild.ipynb",
+        "manage_db/rebuild_molecule_provenance_gaps.py"
       ],
       "mappings_and_joins": "Normalize legacy node and endpoint identifiers to the declared Jouvence namespaces while preserving source labels and typed endpoints.",
       "meaning": "EFO / MONDO hierarchy",
@@ -1677,14 +1680,14 @@
       },
       "name": "disease_subtype_of_disease",
       "native_inputs": [
-        "https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/CNQV69"
+        "https://dataverse.harvard.edu/api/access/datafile/7144484"
       ],
       "native_source": [
-        "https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/CNQV69"
+        "https://dataverse.harvard.edu/api/access/datafile/7144484"
       ],
       "non_meaning": "It is not evidence multiplicity: source-specific support belongs in the matching evidence table.",
       "pipeline_family": "txgnn_legacy",
-      "problems_and_decisions": "The immutable Dataverse identity is known, but the complete accepted acquisition/build argv and several constituent source releases are not tracked.",
+      "problems_and_decisions": "The five molecule lineages now have an immutable flattened-source builder and exact TxGNN file identity; they remain provenance-gap until full parity/exception evidence and independent review. Other legacy family outputs retain historical-only lineage.",
       "producer": null,
       "producer_builder": null,
       "provenance_gaps": [
@@ -1704,7 +1707,7 @@
       },
       "quarantines_exclusions_missing": "Do not infer missing evidence, source releases or endpoint projections from a legacy relation name.",
       "rebuild_command_evidenced": false,
-      "release": "TxData Dataverse DOI 10.7910/DVN/CNQV69; constituent upstream releases vary and are not always recoverable",
+      "release": "TxGNN/DeepPurpose Dataverse v6.0 kg.csv, file 7144484, published 2023-06-07, MD5 aac8191d4fbc5bf09cdf8c3c78b4e75f; constituent upstream releases are not encoded",
       "replay_level": "historical-builder-only",
       "reproduce_notebook": "notebooks/reproduce/txgnn_legacy_bundle.ipynb",
       "reproducibility_limits": "This notebook documents and checks current artifact identity. It does not prove that historical native inputs can recreate identical biological rows unless the status and evidence explicitly establish that stronger claim.",
@@ -2323,7 +2326,8 @@
         "docs/storage-migration-20260727/object-map.json",
         "reproduce/06_build_core_edges_and_evidence.ipynb",
         "reproduce/26_source_reproduction_index.ipynb",
-        "manage_db/export_kg.py"
+        "reproduce/30_molecule_provenance_gap_rebuild.ipynb",
+        "manage_db/rebuild_molecule_provenance_gaps.py"
       ],
       "mappings_and_joins": "Normalize legacy node and endpoint identifiers to the declared Jouvence namespaces while preserving source labels and typed endpoints.",
       "meaning": "Cross-species orthology",
@@ -2337,14 +2341,14 @@
       },
       "name": "gene_ortholog_gene",
       "native_inputs": [
-        "https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/CNQV69"
+        "https://dataverse.harvard.edu/api/access/datafile/7144484"
       ],
       "native_source": [
-        "https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/CNQV69"
+        "https://dataverse.harvard.edu/api/access/datafile/7144484"
       ],
       "non_meaning": "It is not evidence multiplicity: source-specific support belongs in the matching evidence table.",
       "pipeline_family": "txgnn_legacy",
-      "problems_and_decisions": "The immutable Dataverse identity is known, but the complete accepted acquisition/build argv and several constituent source releases are not tracked.",
+      "problems_and_decisions": "The five molecule lineages now have an immutable flattened-source builder and exact TxGNN file identity; they remain provenance-gap until full parity/exception evidence and independent review. Other legacy family outputs retain historical-only lineage.",
       "producer": null,
       "producer_builder": null,
       "provenance_gaps": [
@@ -2364,7 +2368,7 @@
       },
       "quarantines_exclusions_missing": "Do not infer missing evidence, source releases or endpoint projections from a legacy relation name.",
       "rebuild_command_evidenced": false,
-      "release": "TxData Dataverse DOI 10.7910/DVN/CNQV69; constituent upstream releases vary and are not always recoverable",
+      "release": "TxGNN/DeepPurpose Dataverse v6.0 kg.csv, file 7144484, published 2023-06-07, MD5 aac8191d4fbc5bf09cdf8c3c78b4e75f; constituent upstream releases are not encoded",
       "replay_level": "historical-builder-only",
       "reproduce_notebook": "notebooks/reproduce/txgnn_legacy_bundle.ipynb",
       "reproducibility_limits": "This notebook documents and checks current artifact identity. It does not prove that historical native inputs can recreate identical biological rows unless the status and evidence explicitly establish that stronger claim.",
@@ -2421,7 +2425,7 @@
           "nullable": true
         }
       ],
-      "full_worker_rebuild_command": null,
+      "full_worker_rebuild_command": "uv run python -m manage_db.rebuild_molecule_provenance_gaps --acquire-to artifacts/cache/<task-id>/txgnn_kg_file_7144484.csv --output-dir artifacts/staged/<task-id>/molecule-provenance-gaps --canonical-dir <worker-local-main> --canonical-manifest artifacts/cache/<task-id>/canonical-snapshot-manifest.json --launcher-receipt <fresh-project-launcher-receipt.json>",
       "keys": {
         "candidate_join": [],
         "linkage": [
@@ -2436,9 +2440,7 @@
         "uniqueness": "uniqueness unvalidated by footer-only catalog collection"
       },
       "known_gaps": [
-        "current builder",
-        "exact accepted source-to-object lineage",
-        "verified exact rebuild command"
+        "exact accepted source-to-object lineage"
       ],
       "layer": "edges",
       "links": [
@@ -2448,7 +2450,8 @@
         "docs/storage-migration-20260727/object-map.json",
         "reproduce/06_build_core_edges_and_evidence.ipynb",
         "reproduce/26_source_reproduction_index.ipynb",
-        "manage_db/export_kg.py",
+        "reproduce/30_molecule_provenance_gap_rebuild.ipynb",
+        "manage_db/rebuild_molecule_provenance_gaps.py",
         "docs/relation-provenance-and-gaps.md"
       ],
       "mappings_and_joins": "Normalize legacy node and endpoint identifiers to the declared Jouvence namespaces while preserving source labels and typed endpoints.",
@@ -2463,20 +2466,18 @@
       },
       "name": "molecule_associated_phenotype",
       "native_inputs": [
-        "https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/CNQV69"
+        "https://dataverse.harvard.edu/api/access/datafile/7144484"
       ],
       "native_source": [
-        "https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/CNQV69"
+        "https://dataverse.harvard.edu/api/access/datafile/7144484"
       ],
       "non_meaning": "It is not evidence multiplicity: source-specific support belongs in the matching evidence table.",
       "pipeline_family": "txgnn_legacy",
-      "problems_and_decisions": "The immutable Dataverse identity is known, but the complete accepted acquisition/build argv and several constituent source releases are not tracked.",
-      "producer": null,
-      "producer_builder": null,
+      "problems_and_decisions": "The five molecule lineages now have an immutable flattened-source builder and exact TxGNN file identity; they remain provenance-gap until full parity/exception evidence and independent review. Other legacy family outputs retain historical-only lineage.",
+      "producer": "manage_db/rebuild_molecule_provenance_gaps.py",
+      "producer_builder": "manage_db/rebuild_molecule_provenance_gaps.py",
       "provenance_gaps": [
-        "current builder",
-        "exact accepted source-to-object lineage",
-        "verified exact rebuild command"
+        "exact accepted source-to-object lineage"
       ],
       "qc": {
         "as_of": "2026-07-27",
@@ -2490,8 +2491,8 @@
         "schema_hash_version": "arrow-fields-v1"
       },
       "quarantines_exclusions_missing": "Do not infer missing evidence, source releases or endpoint projections from a legacy relation name.",
-      "rebuild_command_evidenced": false,
-      "release": "TxData Dataverse DOI 10.7910/DVN/CNQV69; constituent upstream releases vary and are not always recoverable",
+      "rebuild_command_evidenced": true,
+      "release": "TxGNN/DeepPurpose Dataverse v6.0 kg.csv, file 7144484, published 2023-06-07, MD5 aac8191d4fbc5bf09cdf8c3c78b4e75f; constituent upstream releases are not encoded",
       "replay_level": "provenance-gap",
       "reproduce_notebook": "notebooks/reproduce/txgnn_legacy_bundle.ipynb",
       "reproducibility_limits": "This notebook documents and checks current artifact identity. It does not prove that historical native inputs can recreate identical biological rows unless the status and evidence explicitly establish that stronger claim.",
@@ -2548,7 +2549,7 @@
           "nullable": true
         }
       ],
-      "full_worker_rebuild_command": null,
+      "full_worker_rebuild_command": "uv run python -m manage_db.rebuild_molecule_provenance_gaps --acquire-to artifacts/cache/<task-id>/txgnn_kg_file_7144484.csv --output-dir artifacts/staged/<task-id>/molecule-provenance-gaps --canonical-dir <worker-local-main> --canonical-manifest artifacts/cache/<task-id>/canonical-snapshot-manifest.json --launcher-receipt <fresh-project-launcher-receipt.json>",
       "keys": {
         "candidate_join": [],
         "linkage": [
@@ -2563,9 +2564,7 @@
         "uniqueness": "uniqueness unvalidated by footer-only catalog collection"
       },
       "known_gaps": [
-        "current builder",
-        "exact accepted source-to-object lineage",
-        "verified exact rebuild command"
+        "exact accepted source-to-object lineage"
       ],
       "layer": "edges",
       "links": [
@@ -2575,7 +2574,8 @@
         "docs/storage-migration-20260727/object-map.json",
         "reproduce/06_build_core_edges_and_evidence.ipynb",
         "reproduce/26_source_reproduction_index.ipynb",
-        "manage_db/export_kg.py",
+        "reproduce/30_molecule_provenance_gap_rebuild.ipynb",
+        "manage_db/rebuild_molecule_provenance_gaps.py",
         "docs/relation-provenance-and-gaps.md"
       ],
       "mappings_and_joins": "Normalize legacy node and endpoint identifiers to the declared Jouvence namespaces while preserving source labels and typed endpoints.",
@@ -2590,20 +2590,18 @@
       },
       "name": "molecule_contraindicates_disease",
       "native_inputs": [
-        "https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/CNQV69"
+        "https://dataverse.harvard.edu/api/access/datafile/7144484"
       ],
       "native_source": [
-        "https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/CNQV69"
+        "https://dataverse.harvard.edu/api/access/datafile/7144484"
       ],
       "non_meaning": "It is not evidence multiplicity: source-specific support belongs in the matching evidence table.",
       "pipeline_family": "txgnn_legacy",
-      "problems_and_decisions": "The immutable Dataverse identity is known, but the complete accepted acquisition/build argv and several constituent source releases are not tracked.",
-      "producer": null,
-      "producer_builder": null,
+      "problems_and_decisions": "The five molecule lineages now have an immutable flattened-source builder and exact TxGNN file identity; they remain provenance-gap until full parity/exception evidence and independent review. Other legacy family outputs retain historical-only lineage.",
+      "producer": "manage_db/rebuild_molecule_provenance_gaps.py",
+      "producer_builder": "manage_db/rebuild_molecule_provenance_gaps.py",
       "provenance_gaps": [
-        "current builder",
-        "exact accepted source-to-object lineage",
-        "verified exact rebuild command"
+        "exact accepted source-to-object lineage"
       ],
       "qc": {
         "as_of": "2026-07-27",
@@ -2617,8 +2615,8 @@
         "schema_hash_version": "arrow-fields-v1"
       },
       "quarantines_exclusions_missing": "Do not infer missing evidence, source releases or endpoint projections from a legacy relation name.",
-      "rebuild_command_evidenced": false,
-      "release": "TxData Dataverse DOI 10.7910/DVN/CNQV69; constituent upstream releases vary and are not always recoverable",
+      "rebuild_command_evidenced": true,
+      "release": "TxGNN/DeepPurpose Dataverse v6.0 kg.csv, file 7144484, published 2023-06-07, MD5 aac8191d4fbc5bf09cdf8c3c78b4e75f; constituent upstream releases are not encoded",
       "replay_level": "provenance-gap",
       "reproduce_notebook": "notebooks/reproduce/txgnn_legacy_bundle.ipynb",
       "reproducibility_limits": "This notebook documents and checks current artifact identity. It does not prove that historical native inputs can recreate identical biological rows unless the status and evidence explicitly establish that stronger claim.",
@@ -2798,7 +2796,7 @@
           "nullable": true
         }
       ],
-      "full_worker_rebuild_command": null,
+      "full_worker_rebuild_command": "uv run python -m manage_db.rebuild_molecule_provenance_gaps --acquire-to artifacts/cache/<task-id>/txgnn_kg_file_7144484.csv --output-dir artifacts/staged/<task-id>/molecule-provenance-gaps --canonical-dir <worker-local-main> --canonical-manifest artifacts/cache/<task-id>/canonical-snapshot-manifest.json --launcher-receipt <fresh-project-launcher-receipt.json>",
       "keys": {
         "candidate_join": [],
         "linkage": [
@@ -2813,9 +2811,7 @@
         "uniqueness": "uniqueness unvalidated by footer-only catalog collection"
       },
       "known_gaps": [
-        "current builder",
-        "exact accepted source-to-object lineage",
-        "verified exact rebuild command"
+        "exact accepted source-to-object lineage"
       ],
       "layer": "edges",
       "links": [
@@ -2825,7 +2821,8 @@
         "docs/storage-migration-20260727/object-map.json",
         "reproduce/06_build_core_edges_and_evidence.ipynb",
         "reproduce/26_source_reproduction_index.ipynb",
-        "manage_db/export_kg.py",
+        "reproduce/30_molecule_provenance_gap_rebuild.ipynb",
+        "manage_db/rebuild_molecule_provenance_gaps.py",
         "docs/relation-provenance-and-gaps.md"
       ],
       "mappings_and_joins": "Normalize legacy node and endpoint identifiers to the declared Jouvence namespaces while preserving source labels and typed endpoints.",
@@ -2840,20 +2837,18 @@
       },
       "name": "molecule_parent_of_molecule",
       "native_inputs": [
-        "https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/CNQV69"
+        "https://dataverse.harvard.edu/api/access/datafile/7144484"
       ],
       "native_source": [
-        "https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/CNQV69"
+        "https://dataverse.harvard.edu/api/access/datafile/7144484"
       ],
       "non_meaning": "It is not evidence multiplicity: source-specific support belongs in the matching evidence table.",
       "pipeline_family": "txgnn_legacy",
-      "problems_and_decisions": "The immutable Dataverse identity is known, but the complete accepted acquisition/build argv and several constituent source releases are not tracked.",
-      "producer": null,
-      "producer_builder": null,
+      "problems_and_decisions": "The five molecule lineages now have an immutable flattened-source builder and exact TxGNN file identity; they remain provenance-gap until full parity/exception evidence and independent review. Other legacy family outputs retain historical-only lineage.",
+      "producer": "manage_db/rebuild_molecule_provenance_gaps.py",
+      "producer_builder": "manage_db/rebuild_molecule_provenance_gaps.py",
       "provenance_gaps": [
-        "current builder",
-        "exact accepted source-to-object lineage",
-        "verified exact rebuild command"
+        "exact accepted source-to-object lineage"
       ],
       "qc": {
         "as_of": "2026-07-27",
@@ -2867,8 +2862,8 @@
         "schema_hash_version": "arrow-fields-v1"
       },
       "quarantines_exclusions_missing": "Do not infer missing evidence, source releases or endpoint projections from a legacy relation name.",
-      "rebuild_command_evidenced": false,
-      "release": "TxData Dataverse DOI 10.7910/DVN/CNQV69; constituent upstream releases vary and are not always recoverable",
+      "rebuild_command_evidenced": true,
+      "release": "TxGNN/DeepPurpose Dataverse v6.0 kg.csv, file 7144484, published 2023-06-07, MD5 aac8191d4fbc5bf09cdf8c3c78b4e75f; constituent upstream releases are not encoded",
       "replay_level": "provenance-gap",
       "reproduce_notebook": "notebooks/reproduce/txgnn_legacy_bundle.ipynb",
       "reproducibility_limits": "This notebook documents and checks current artifact identity. It does not prove that historical native inputs can recreate identical biological rows unless the status and evidence explicitly establish that stronger claim.",
@@ -2925,7 +2920,7 @@
           "nullable": true
         }
       ],
-      "full_worker_rebuild_command": null,
+      "full_worker_rebuild_command": "uv run python -m manage_db.rebuild_molecule_provenance_gaps --acquire-to artifacts/cache/<task-id>/txgnn_kg_file_7144484.csv --output-dir artifacts/staged/<task-id>/molecule-provenance-gaps --canonical-dir <worker-local-main> --canonical-manifest artifacts/cache/<task-id>/canonical-snapshot-manifest.json --launcher-receipt <fresh-project-launcher-receipt.json>",
       "keys": {
         "candidate_join": [],
         "linkage": [
@@ -2940,9 +2935,7 @@
         "uniqueness": "uniqueness unvalidated by footer-only catalog collection"
       },
       "known_gaps": [
-        "current builder",
-        "exact accepted source-to-object lineage",
-        "verified exact rebuild command"
+        "exact accepted source-to-object lineage"
       ],
       "layer": "edges",
       "links": [
@@ -2952,7 +2945,8 @@
         "docs/storage-migration-20260727/object-map.json",
         "reproduce/06_build_core_edges_and_evidence.ipynb",
         "reproduce/26_source_reproduction_index.ipynb",
-        "manage_db/export_kg.py",
+        "reproduce/30_molecule_provenance_gap_rebuild.ipynb",
+        "manage_db/rebuild_molecule_provenance_gaps.py",
         "docs/relation-provenance-and-gaps.md"
       ],
       "mappings_and_joins": "Normalize legacy node and endpoint identifiers to the declared Jouvence namespaces while preserving source labels and typed endpoints.",
@@ -2967,20 +2961,18 @@
       },
       "name": "molecule_synergizes_molecule",
       "native_inputs": [
-        "https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/CNQV69"
+        "https://dataverse.harvard.edu/api/access/datafile/7144484"
       ],
       "native_source": [
-        "https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/CNQV69"
+        "https://dataverse.harvard.edu/api/access/datafile/7144484"
       ],
       "non_meaning": "It is not evidence multiplicity: source-specific support belongs in the matching evidence table.",
       "pipeline_family": "txgnn_legacy",
-      "problems_and_decisions": "The immutable Dataverse identity is known, but the complete accepted acquisition/build argv and several constituent source releases are not tracked.",
-      "producer": null,
-      "producer_builder": null,
+      "problems_and_decisions": "The five molecule lineages now have an immutable flattened-source builder and exact TxGNN file identity; they remain provenance-gap until full parity/exception evidence and independent review. Other legacy family outputs retain historical-only lineage.",
+      "producer": "manage_db/rebuild_molecule_provenance_gaps.py",
+      "producer_builder": "manage_db/rebuild_molecule_provenance_gaps.py",
       "provenance_gaps": [
-        "current builder",
-        "exact accepted source-to-object lineage",
-        "verified exact rebuild command"
+        "exact accepted source-to-object lineage"
       ],
       "qc": {
         "as_of": "2026-07-27",
@@ -2994,8 +2986,8 @@
         "schema_hash_version": "arrow-fields-v1"
       },
       "quarantines_exclusions_missing": "Do not infer missing evidence, source releases or endpoint projections from a legacy relation name.",
-      "rebuild_command_evidenced": false,
-      "release": "TxData Dataverse DOI 10.7910/DVN/CNQV69; constituent upstream releases vary and are not always recoverable",
+      "rebuild_command_evidenced": true,
+      "release": "TxGNN/DeepPurpose Dataverse v6.0 kg.csv, file 7144484, published 2023-06-07, MD5 aac8191d4fbc5bf09cdf8c3c78b4e75f; constituent upstream releases are not encoded",
       "replay_level": "provenance-gap",
       "reproduce_notebook": "notebooks/reproduce/txgnn_legacy_bundle.ipynb",
       "reproducibility_limits": "This notebook documents and checks current artifact identity. It does not prove that historical native inputs can recreate identical biological rows unless the status and evidence explicitly establish that stronger claim.",
@@ -3181,7 +3173,7 @@
           "nullable": true
         }
       ],
-      "full_worker_rebuild_command": null,
+      "full_worker_rebuild_command": "uv run python -m manage_db.rebuild_molecule_provenance_gaps --acquire-to artifacts/cache/<task-id>/txgnn_kg_file_7144484.csv --output-dir artifacts/staged/<task-id>/molecule-provenance-gaps --canonical-dir <worker-local-main> --canonical-manifest artifacts/cache/<task-id>/canonical-snapshot-manifest.json --launcher-receipt <fresh-project-launcher-receipt.json>",
       "keys": {
         "candidate_join": [],
         "linkage": [
@@ -3196,9 +3188,7 @@
         "uniqueness": "uniqueness unvalidated by footer-only catalog collection"
       },
       "known_gaps": [
-        "current builder",
-        "exact accepted source-to-object lineage",
-        "verified exact rebuild command"
+        "exact accepted source-to-object lineage"
       ],
       "layer": "edges",
       "links": [
@@ -3208,7 +3198,8 @@
         "docs/storage-migration-20260727/object-map.json",
         "reproduce/06_build_core_edges_and_evidence.ipynb",
         "reproduce/26_source_reproduction_index.ipynb",
-        "manage_db/export_kg.py",
+        "reproduce/30_molecule_provenance_gap_rebuild.ipynb",
+        "manage_db/rebuild_molecule_provenance_gaps.py",
         "docs/relation-provenance-and-gaps.md"
       ],
       "mappings_and_joins": "Normalize legacy node and endpoint identifiers to the declared Jouvence namespaces while preserving source labels and typed endpoints.",
@@ -3223,20 +3214,18 @@
       },
       "name": "molecule_treats_disease",
       "native_inputs": [
-        "https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/CNQV69"
+        "https://dataverse.harvard.edu/api/access/datafile/7144484"
       ],
       "native_source": [
-        "https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/CNQV69"
+        "https://dataverse.harvard.edu/api/access/datafile/7144484"
       ],
       "non_meaning": "It is not evidence multiplicity: source-specific support belongs in the matching evidence table.",
       "pipeline_family": "txgnn_legacy",
-      "problems_and_decisions": "The immutable Dataverse identity is known, but the complete accepted acquisition/build argv and several constituent source releases are not tracked.",
-      "producer": null,
-      "producer_builder": null,
+      "problems_and_decisions": "The five molecule lineages now have an immutable flattened-source builder and exact TxGNN file identity; they remain provenance-gap until full parity/exception evidence and independent review. Other legacy family outputs retain historical-only lineage.",
+      "producer": "manage_db/rebuild_molecule_provenance_gaps.py",
+      "producer_builder": "manage_db/rebuild_molecule_provenance_gaps.py",
       "provenance_gaps": [
-        "current builder",
-        "exact accepted source-to-object lineage",
-        "verified exact rebuild command"
+        "exact accepted source-to-object lineage"
       ],
       "qc": {
         "as_of": "2026-07-27",
@@ -3250,8 +3239,8 @@
         "schema_hash_version": "arrow-fields-v1"
       },
       "quarantines_exclusions_missing": "Do not infer missing evidence, source releases or endpoint projections from a legacy relation name.",
-      "rebuild_command_evidenced": false,
-      "release": "TxData Dataverse DOI 10.7910/DVN/CNQV69; constituent upstream releases vary and are not always recoverable",
+      "rebuild_command_evidenced": true,
+      "release": "TxGNN/DeepPurpose Dataverse v6.0 kg.csv, file 7144484, published 2023-06-07, MD5 aac8191d4fbc5bf09cdf8c3c78b4e75f; constituent upstream releases are not encoded",
       "replay_level": "provenance-gap",
       "reproduce_notebook": "notebooks/reproduce/txgnn_legacy_bundle.ipynb",
       "reproducibility_limits": "This notebook documents and checks current artifact identity. It does not prove that historical native inputs can recreate identical biological rows unless the status and evidence explicitly establish that stronger claim.",
@@ -5131,7 +5120,8 @@
         "docs/storage-migration-20260727/object-map.json",
         "reproduce/06_build_core_edges_and_evidence.ipynb",
         "reproduce/26_source_reproduction_index.ipynb",
-        "manage_db/export_kg.py"
+        "reproduce/30_molecule_provenance_gap_rebuild.ipynb",
+        "manage_db/rebuild_molecule_provenance_gaps.py"
       ],
       "mappings_and_joins": "Normalize legacy node and endpoint identifiers to the declared Jouvence namespaces while preserving source labels and typed endpoints.",
       "meaning": "GTEx / HPA bulk RNA",
@@ -5145,14 +5135,14 @@
       },
       "name": "tissue_expresses_gene",
       "native_inputs": [
-        "https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/CNQV69"
+        "https://dataverse.harvard.edu/api/access/datafile/7144484"
       ],
       "native_source": [
-        "https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/CNQV69"
+        "https://dataverse.harvard.edu/api/access/datafile/7144484"
       ],
       "non_meaning": "It is not evidence multiplicity: source-specific support belongs in the matching evidence table.",
       "pipeline_family": "txgnn_legacy",
-      "problems_and_decisions": "The immutable Dataverse identity is known, but the complete accepted acquisition/build argv and several constituent source releases are not tracked.",
+      "problems_and_decisions": "The five molecule lineages now have an immutable flattened-source builder and exact TxGNN file identity; they remain provenance-gap until full parity/exception evidence and independent review. Other legacy family outputs retain historical-only lineage.",
       "producer": null,
       "producer_builder": null,
       "provenance_gaps": [
@@ -5172,7 +5162,7 @@
       },
       "quarantines_exclusions_missing": "Do not infer missing evidence, source releases or endpoint projections from a legacy relation name.",
       "rebuild_command_evidenced": false,
-      "release": "TxData Dataverse DOI 10.7910/DVN/CNQV69; constituent upstream releases vary and are not always recoverable",
+      "release": "TxGNN/DeepPurpose Dataverse v6.0 kg.csv, file 7144484, published 2023-06-07, MD5 aac8191d4fbc5bf09cdf8c3c78b4e75f; constituent upstream releases are not encoded",
       "replay_level": "historical-builder-only",
       "reproduce_notebook": "notebooks/reproduce/txgnn_legacy_bundle.ipynb",
       "reproducibility_limits": "This notebook documents and checks current artifact identity. It does not prove that historical native inputs can recreate identical biological rows unless the status and evidence explicitly establish that stronger claim.",
@@ -10302,7 +10292,8 @@
         "docs/storage-migration-20260727/object-map.json",
         "reproduce/06_build_core_edges_and_evidence.ipynb",
         "reproduce/26_source_reproduction_index.ipynb",
-        "manage_db/export_kg.py"
+        "reproduce/30_molecule_provenance_gap_rebuild.ipynb",
+        "manage_db/rebuild_molecule_provenance_gaps.py"
       ],
       "mappings_and_joins": "Normalize legacy node and endpoint identifiers to the declared Jouvence namespaces while preserving source labels and typed endpoints.",
       "meaning": "Source-level support records for the canonical `gene_ortholog_gene` assertion.",
@@ -10316,14 +10307,14 @@
       },
       "name": "gene_ortholog_gene",
       "native_inputs": [
-        "https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/CNQV69"
+        "https://dataverse.harvard.edu/api/access/datafile/7144484"
       ],
       "native_source": [
-        "https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/CNQV69"
+        "https://dataverse.harvard.edu/api/access/datafile/7144484"
       ],
       "non_meaning": "Rows are not additional graph edges and evidence row count is not edge count or independent-study count.",
       "pipeline_family": "txgnn_legacy",
-      "problems_and_decisions": "The immutable Dataverse identity is known, but the complete accepted acquisition/build argv and several constituent source releases are not tracked.",
+      "problems_and_decisions": "The five molecule lineages now have an immutable flattened-source builder and exact TxGNN file identity; they remain provenance-gap until full parity/exception evidence and independent review. Other legacy family outputs retain historical-only lineage.",
       "producer": null,
       "producer_builder": null,
       "provenance_gaps": [
@@ -10343,7 +10334,7 @@
       },
       "quarantines_exclusions_missing": "Do not infer missing evidence, source releases or endpoint projections from a legacy relation name.",
       "rebuild_command_evidenced": false,
-      "release": "TxData Dataverse DOI 10.7910/DVN/CNQV69; constituent upstream releases vary and are not always recoverable",
+      "release": "TxGNN/DeepPurpose Dataverse v6.0 kg.csv, file 7144484, published 2023-06-07, MD5 aac8191d4fbc5bf09cdf8c3c78b4e75f; constituent upstream releases are not encoded",
       "replay_level": "historical-builder-only",
       "reproduce_notebook": "notebooks/reproduce/txgnn_legacy_bundle.ipynb",
       "reproducibility_limits": "This notebook documents and checks current artifact identity. It does not prove that historical native inputs can recreate identical biological rows unless the status and evidence explicitly establish that stronger claim.",
@@ -10716,7 +10707,8 @@
         "docs/storage-migration-20260727/object-map.json",
         "reproduce/06_build_core_edges_and_evidence.ipynb",
         "reproduce/26_source_reproduction_index.ipynb",
-        "manage_db/export_kg.py"
+        "reproduce/30_molecule_provenance_gap_rebuild.ipynb",
+        "manage_db/rebuild_molecule_provenance_gaps.py"
       ],
       "mappings_and_joins": "Normalize legacy node and endpoint identifiers to the declared Jouvence namespaces while preserving source labels and typed endpoints.",
       "meaning": "Source-level support records for the canonical `molecule_treats_disease` assertion.",
@@ -10730,14 +10722,14 @@
       },
       "name": "molecule_treats_disease",
       "native_inputs": [
-        "https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/CNQV69"
+        "https://dataverse.harvard.edu/api/access/datafile/7144484"
       ],
       "native_source": [
-        "https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/CNQV69"
+        "https://dataverse.harvard.edu/api/access/datafile/7144484"
       ],
       "non_meaning": "Rows are not additional graph edges and evidence row count is not edge count or independent-study count.",
       "pipeline_family": "txgnn_legacy",
-      "problems_and_decisions": "The immutable Dataverse identity is known, but the complete accepted acquisition/build argv and several constituent source releases are not tracked.",
+      "problems_and_decisions": "The five molecule lineages now have an immutable flattened-source builder and exact TxGNN file identity; they remain provenance-gap until full parity/exception evidence and independent review. Other legacy family outputs retain historical-only lineage.",
       "producer": null,
       "producer_builder": null,
       "provenance_gaps": [
@@ -10757,7 +10749,7 @@
       },
       "quarantines_exclusions_missing": "Do not infer missing evidence, source releases or endpoint projections from a legacy relation name.",
       "rebuild_command_evidenced": false,
-      "release": "TxData Dataverse DOI 10.7910/DVN/CNQV69; constituent upstream releases vary and are not always recoverable",
+      "release": "TxGNN/DeepPurpose Dataverse v6.0 kg.csv, file 7144484, published 2023-06-07, MD5 aac8191d4fbc5bf09cdf8c3c78b4e75f; constituent upstream releases are not encoded",
       "replay_level": "historical-builder-only",
       "reproduce_notebook": "notebooks/reproduce/txgnn_legacy_bundle.ipynb",
       "reproducibility_limits": "This notebook documents and checks current artifact identity. It does not prove that historical native inputs can recreate identical biological rows unless the status and evidence explicitly establish that stronger claim.",
@@ -13384,7 +13376,8 @@
         "docs/storage-migration-20260727/object-map.json",
         "reproduce/06_build_core_edges_and_evidence.ipynb",
         "reproduce/26_source_reproduction_index.ipynb",
-        "manage_db/export_kg.py"
+        "reproduce/30_molecule_provenance_gap_rebuild.ipynb",
+        "manage_db/rebuild_molecule_provenance_gaps.py"
       ],
       "mappings_and_joins": "Normalize legacy node and endpoint identifiers to the declared Jouvence namespaces while preserving source labels and typed endpoints.",
       "meaning": "Source-backed text payloads for `cell_type` nodes, suitable for retrieval or text feature construction.",
@@ -13398,14 +13391,14 @@
       },
       "name": "cell_type_textual_summary",
       "native_inputs": [
-        "https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/CNQV69"
+        "https://dataverse.harvard.edu/api/access/datafile/7144484"
       ],
       "native_source": [
-        "https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/CNQV69"
+        "https://dataverse.harvard.edu/api/access/datafile/7144484"
       ],
       "non_meaning": "Text is not a curated label, causal claim, or complete coverage of the node table.",
       "pipeline_family": "txgnn_legacy",
-      "problems_and_decisions": "The immutable Dataverse identity is known, but the complete accepted acquisition/build argv and several constituent source releases are not tracked.",
+      "problems_and_decisions": "The five molecule lineages now have an immutable flattened-source builder and exact TxGNN file identity; they remain provenance-gap until full parity/exception evidence and independent review. Other legacy family outputs retain historical-only lineage.",
       "producer": null,
       "producer_builder": null,
       "provenance_gaps": [
@@ -13425,7 +13418,7 @@
       },
       "quarantines_exclusions_missing": "Do not infer missing evidence, source releases or endpoint projections from a legacy relation name.",
       "rebuild_command_evidenced": false,
-      "release": "TxData Dataverse DOI 10.7910/DVN/CNQV69; constituent upstream releases vary and are not always recoverable",
+      "release": "TxGNN/DeepPurpose Dataverse v6.0 kg.csv, file 7144484, published 2023-06-07, MD5 aac8191d4fbc5bf09cdf8c3c78b4e75f; constituent upstream releases are not encoded",
       "replay_level": "historical-builder-only",
       "reproduce_notebook": "notebooks/reproduce/txgnn_legacy_bundle.ipynb",
       "reproducibility_limits": "This notebook documents and checks current artifact identity. It does not prove that historical native inputs can recreate identical biological rows unless the status and evidence explicitly establish that stronger claim.",
@@ -14005,7 +13998,8 @@
         "docs/storage-migration-20260727/object-map.json",
         "reproduce/06_build_core_edges_and_evidence.ipynb",
         "reproduce/26_source_reproduction_index.ipynb",
-        "manage_db/export_kg.py"
+        "reproduce/30_molecule_provenance_gap_rebuild.ipynb",
+        "manage_db/rebuild_molecule_provenance_gaps.py"
       ],
       "mappings_and_joins": "Normalize legacy node and endpoint identifiers to the declared Jouvence namespaces while preserving source labels and typed endpoints.",
       "meaning": "Source-backed text payloads for `disease` nodes, suitable for retrieval or text feature construction.",
@@ -14019,14 +14013,14 @@
       },
       "name": "disease_textual_summary",
       "native_inputs": [
-        "https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/CNQV69"
+        "https://dataverse.harvard.edu/api/access/datafile/7144484"
       ],
       "native_source": [
-        "https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/CNQV69"
+        "https://dataverse.harvard.edu/api/access/datafile/7144484"
       ],
       "non_meaning": "Text is not a curated label, causal claim, or complete coverage of the node table.",
       "pipeline_family": "txgnn_legacy",
-      "problems_and_decisions": "The immutable Dataverse identity is known, but the complete accepted acquisition/build argv and several constituent source releases are not tracked.",
+      "problems_and_decisions": "The five molecule lineages now have an immutable flattened-source builder and exact TxGNN file identity; they remain provenance-gap until full parity/exception evidence and independent review. Other legacy family outputs retain historical-only lineage.",
       "producer": null,
       "producer_builder": null,
       "provenance_gaps": [
@@ -14046,7 +14040,7 @@
       },
       "quarantines_exclusions_missing": "Do not infer missing evidence, source releases or endpoint projections from a legacy relation name.",
       "rebuild_command_evidenced": false,
-      "release": "TxData Dataverse DOI 10.7910/DVN/CNQV69; constituent upstream releases vary and are not always recoverable",
+      "release": "TxGNN/DeepPurpose Dataverse v6.0 kg.csv, file 7144484, published 2023-06-07, MD5 aac8191d4fbc5bf09cdf8c3c78b4e75f; constituent upstream releases are not encoded",
       "replay_level": "historical-builder-only",
       "reproduce_notebook": "notebooks/reproduce/txgnn_legacy_bundle.ipynb",
       "reproducibility_limits": "This notebook documents and checks current artifact identity. It does not prove that historical native inputs can recreate identical biological rows unless the status and evidence explicitly establish that stronger claim.",
@@ -14157,7 +14151,8 @@
         "docs/storage-migration-20260727/object-map.json",
         "reproduce/06_build_core_edges_and_evidence.ipynb",
         "reproduce/26_source_reproduction_index.ipynb",
-        "manage_db/export_kg.py"
+        "reproduce/30_molecule_provenance_gap_rebuild.ipynb",
+        "manage_db/rebuild_molecule_provenance_gaps.py"
       ],
       "mappings_and_joins": "Normalize legacy node and endpoint identifiers to the declared Jouvence namespaces while preserving source labels and typed endpoints.",
       "meaning": "Source-backed text payloads for `gene` nodes, suitable for retrieval or text feature construction.",
@@ -14171,14 +14166,14 @@
       },
       "name": "gene_textual_summary",
       "native_inputs": [
-        "https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/CNQV69"
+        "https://dataverse.harvard.edu/api/access/datafile/7144484"
       ],
       "native_source": [
-        "https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/CNQV69"
+        "https://dataverse.harvard.edu/api/access/datafile/7144484"
       ],
       "non_meaning": "Text is not a curated label, causal claim, or complete coverage of the node table.",
       "pipeline_family": "txgnn_legacy",
-      "problems_and_decisions": "The immutable Dataverse identity is known, but the complete accepted acquisition/build argv and several constituent source releases are not tracked.",
+      "problems_and_decisions": "The five molecule lineages now have an immutable flattened-source builder and exact TxGNN file identity; they remain provenance-gap until full parity/exception evidence and independent review. Other legacy family outputs retain historical-only lineage.",
       "producer": null,
       "producer_builder": null,
       "provenance_gaps": [
@@ -14198,7 +14193,7 @@
       },
       "quarantines_exclusions_missing": "Do not infer missing evidence, source releases or endpoint projections from a legacy relation name.",
       "rebuild_command_evidenced": false,
-      "release": "TxData Dataverse DOI 10.7910/DVN/CNQV69; constituent upstream releases vary and are not always recoverable",
+      "release": "TxGNN/DeepPurpose Dataverse v6.0 kg.csv, file 7144484, published 2023-06-07, MD5 aac8191d4fbc5bf09cdf8c3c78b4e75f; constituent upstream releases are not encoded",
       "replay_level": "historical-builder-only",
       "reproduce_notebook": "notebooks/reproduce/txgnn_legacy_bundle.ipynb",
       "reproducibility_limits": "This notebook documents and checks current artifact identity. It does not prove that historical native inputs can recreate identical biological rows unless the status and evidence explicitly establish that stronger claim.",
@@ -14525,7 +14520,8 @@
         "docs/storage-migration-20260727/object-map.json",
         "reproduce/06_build_core_edges_and_evidence.ipynb",
         "reproduce/26_source_reproduction_index.ipynb",
-        "manage_db/export_kg.py"
+        "reproduce/30_molecule_provenance_gap_rebuild.ipynb",
+        "manage_db/rebuild_molecule_provenance_gaps.py"
       ],
       "mappings_and_joins": "Normalize legacy node and endpoint identifiers to the declared Jouvence namespaces while preserving source labels and typed endpoints.",
       "meaning": "Source-backed text payloads for `molecule` nodes, suitable for retrieval or text feature construction.",
@@ -14539,14 +14535,14 @@
       },
       "name": "molecule_textual_summary",
       "native_inputs": [
-        "https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/CNQV69"
+        "https://dataverse.harvard.edu/api/access/datafile/7144484"
       ],
       "native_source": [
-        "https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/CNQV69"
+        "https://dataverse.harvard.edu/api/access/datafile/7144484"
       ],
       "non_meaning": "Text is not a curated label, causal claim, or complete coverage of the node table.",
       "pipeline_family": "txgnn_legacy",
-      "problems_and_decisions": "The immutable Dataverse identity is known, but the complete accepted acquisition/build argv and several constituent source releases are not tracked.",
+      "problems_and_decisions": "The five molecule lineages now have an immutable flattened-source builder and exact TxGNN file identity; they remain provenance-gap until full parity/exception evidence and independent review. Other legacy family outputs retain historical-only lineage.",
       "producer": null,
       "producer_builder": null,
       "provenance_gaps": [
@@ -14566,7 +14562,7 @@
       },
       "quarantines_exclusions_missing": "Do not infer missing evidence, source releases or endpoint projections from a legacy relation name.",
       "rebuild_command_evidenced": false,
-      "release": "TxData Dataverse DOI 10.7910/DVN/CNQV69; constituent upstream releases vary and are not always recoverable",
+      "release": "TxGNN/DeepPurpose Dataverse v6.0 kg.csv, file 7144484, published 2023-06-07, MD5 aac8191d4fbc5bf09cdf8c3c78b4e75f; constituent upstream releases are not encoded",
       "replay_level": "historical-builder-only",
       "reproduce_notebook": "notebooks/reproduce/txgnn_legacy_bundle.ipynb",
       "reproducibility_limits": "This notebook documents and checks current artifact identity. It does not prove that historical native inputs can recreate identical biological rows unless the status and evidence explicitly establish that stronger claim.",
@@ -16228,7 +16224,8 @@
         "docs/storage-migration-20260727/object-map.json",
         "reproduce/06_build_core_edges_and_evidence.ipynb",
         "reproduce/26_source_reproduction_index.ipynb",
-        "manage_db/export_kg.py"
+        "reproduce/30_molecule_provenance_gap_rebuild.ipynb",
+        "manage_db/rebuild_molecule_provenance_gaps.py"
       ],
       "mappings_and_joins": "Normalize legacy node and endpoint identifiers to the declared Jouvence namespaces while preserving source labels and typed endpoints.",
       "meaning": "Canonical cell_type registry keyed in the CL namespace (example `CL:0000576`).",
@@ -16242,14 +16239,14 @@
       },
       "name": "cell_type",
       "native_inputs": [
-        "https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/CNQV69"
+        "https://dataverse.harvard.edu/api/access/datafile/7144484"
       ],
       "native_source": [
-        "https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/CNQV69"
+        "https://dataverse.harvard.edu/api/access/datafile/7144484"
       ],
       "non_meaning": "Presence is an identifier/registry assertion, not evidence for any biological relation.",
       "pipeline_family": "txgnn_legacy",
-      "problems_and_decisions": "The immutable Dataverse identity is known, but the complete accepted acquisition/build argv and several constituent source releases are not tracked.",
+      "problems_and_decisions": "The five molecule lineages now have an immutable flattened-source builder and exact TxGNN file identity; they remain provenance-gap until full parity/exception evidence and independent review. Other legacy family outputs retain historical-only lineage.",
       "producer": null,
       "producer_builder": null,
       "provenance_gaps": [
@@ -16269,7 +16266,7 @@
       },
       "quarantines_exclusions_missing": "Do not infer missing evidence, source releases or endpoint projections from a legacy relation name.",
       "rebuild_command_evidenced": false,
-      "release": "TxData Dataverse DOI 10.7910/DVN/CNQV69; constituent upstream releases vary and are not always recoverable",
+      "release": "TxGNN/DeepPurpose Dataverse v6.0 kg.csv, file 7144484, published 2023-06-07, MD5 aac8191d4fbc5bf09cdf8c3c78b4e75f; constituent upstream releases are not encoded",
       "replay_level": "historical-builder-only",
       "reproduce_notebook": "notebooks/reproduce/txgnn_legacy_bundle.ipynb",
       "reproducibility_limits": "This notebook documents and checks current artifact identity. It does not prove that historical native inputs can recreate identical biological rows unless the status and evidence explicitly establish that stronger claim.",
@@ -16323,7 +16320,8 @@
         "docs/storage-migration-20260727/object-map.json",
         "reproduce/06_build_core_edges_and_evidence.ipynb",
         "reproduce/26_source_reproduction_index.ipynb",
-        "manage_db/export_kg.py"
+        "reproduce/30_molecule_provenance_gap_rebuild.ipynb",
+        "manage_db/rebuild_molecule_provenance_gaps.py"
       ],
       "mappings_and_joins": "Normalize legacy node and endpoint identifiers to the declared Jouvence namespaces while preserving source labels and typed endpoints.",
       "meaning": "Canonical dataset registry keyed in the DOI / UUID namespace (example `DOI:10.1038/s41586-023-06221-2`).",
@@ -16337,14 +16335,14 @@
       },
       "name": "dataset",
       "native_inputs": [
-        "https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/CNQV69"
+        "https://dataverse.harvard.edu/api/access/datafile/7144484"
       ],
       "native_source": [
-        "https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/CNQV69"
+        "https://dataverse.harvard.edu/api/access/datafile/7144484"
       ],
       "non_meaning": "Presence is an identifier/registry assertion, not evidence for any biological relation.",
       "pipeline_family": "txgnn_legacy",
-      "problems_and_decisions": "The immutable Dataverse identity is known, but the complete accepted acquisition/build argv and several constituent source releases are not tracked.",
+      "problems_and_decisions": "The five molecule lineages now have an immutable flattened-source builder and exact TxGNN file identity; they remain provenance-gap until full parity/exception evidence and independent review. Other legacy family outputs retain historical-only lineage.",
       "producer": null,
       "producer_builder": null,
       "provenance_gaps": [
@@ -16365,7 +16363,7 @@
       },
       "quarantines_exclusions_missing": "Do not infer missing evidence, source releases or endpoint projections from a legacy relation name.",
       "rebuild_command_evidenced": false,
-      "release": "TxData Dataverse DOI 10.7910/DVN/CNQV69; constituent upstream releases vary and are not always recoverable",
+      "release": "TxGNN/DeepPurpose Dataverse v6.0 kg.csv, file 7144484, published 2023-06-07, MD5 aac8191d4fbc5bf09cdf8c3c78b4e75f; constituent upstream releases are not encoded",
       "replay_level": "provenance-gap",
       "reproduce_notebook": "notebooks/reproduce/txgnn_legacy_bundle.ipynb",
       "reproducibility_limits": "This notebook documents and checks current artifact identity. It does not prove that historical native inputs can recreate identical biological rows unless the status and evidence explicitly establish that stronger claim.",

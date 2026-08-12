@@ -221,9 +221,9 @@ def test_legacy_relation_gaps_cannot_disappear_or_be_marked_replayable_without_p
     for dataset_id in RELATION_PROVENANCE_GAP_IDS:
         row = records[dataset_id]
         assert row["reproducibility_status"] == row["replay_level"] == "provenance-gap"
-        assert row["producer_builder"] is None
-        assert row["full_worker_rebuild_command"] is None
-        assert row["rebuild_command_evidenced"] is False
+        assert row["producer_builder"] == "manage_db/rebuild_molecule_provenance_gaps.py"
+        assert "file_7144484" in row["full_worker_rebuild_command"]
+        assert row["rebuild_command_evidenced"] is True
         assert "exact accepted source-to-object lineage" in row["provenance_gaps"]
         assert "docs/relation-provenance-and-gaps.md" in row["links"]
 
