@@ -213,6 +213,9 @@ def migrate_edges(
 
     legacy_rel = edges_df["relation"].astype(str).str.strip()
     new_rel = legacy_rel.map(TXDATA_RELATION_MAP)
+    display_relation = edges_df.get("display_relation", pd.Series("", index=edges_df.index)).astype(str).str.strip()
+    exposure_parent = legacy_rel.eq("exposure_exposure") & display_relation.eq("parent of")
+    new_rel = new_rel.mask(exposure_parent, "molecule_parent_of_molecule")
     unmapped = sorted(set(legacy_rel[new_rel.isna()]))
 
     x_idx = pd.to_numeric(edges_df["x_index"], errors="coerce")
@@ -225,7 +228,7 @@ def migrate_edges(
             "y_id": y_idx.map(index_to_id),
             "y_type": y_idx.map(index_to_type),
             "relation": new_rel,
-            "display_relation": edges_df.get("display_relation", pd.Series("", index=edges_df.index)).astype(str).str.strip(),
+            "display_relation": display_relation,
             "source": "TxGNN",
             "credibility": Credibility.ESTABLISHED_FACT.value,
             "_txdata_relation": legacy_rel,

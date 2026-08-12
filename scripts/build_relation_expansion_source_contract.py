@@ -92,26 +92,41 @@ def _spec(
 
 SPECS: dict[str, dict[str, Any]] = {}
 
-# The five retained canonical edge lineages whose original biological replay is unresolved.
-for relation, source_hint, policy in [
-    ("molecule_associated_phenotype", "TxData/TxGNN Dataverse DOI 10.7910/DVN/CNQV69 constituent side-effect/rescue source", "source-native broad molecule-to-phenotype association; non-causal"),
-    ("molecule_contraindicates_disease", "TxData/TxGNN Dataverse contraindication constituent; otherwise a release-pinned contraindication-specific source", "negative/contraindication assertion only; never reuse positive indication evidence"),
-    ("molecule_parent_of_molecule", "TxData/TxGNN Dataverse chemical hierarchy constituent", "directed parent-to-child chemical hierarchy with explicit salt/mixture policy"),
-    ("molecule_synergizes_molecule", "TxData/TxGNN Dataverse combination-screen constituent(s)", "screen-measured synergy with explicit score threshold, context, symmetry and pair orientation"),
-    ("molecule_treats_disease", "original TxData/TxGNN Dataverse indication constituent; later OpenTargets/ClinicalTrials evidence is support only", "positive indication/treatment assertion; original edge lineage remains separate from later support"),
+# The five retained canonical edge lineages are recoverable from the immutable
+# TxGNN kg.csv release. Constituent releases are not encoded in that flattened
+# file, so the release contract is exact at the accepted TxGNN source boundary.
+TXGNN_KG_OBJECT = {
+    "doi": "10.7910/DVN/CNQV69",
+    "dataverse_file_id": "7144484",
+    "filename": "kg.csv",
+    "version": "6.0",
+    "published": "2023-06-07T04:55:16Z",
+    "size": 981751236,
+    "md5": "aac8191d4fbc5bf09cdf8c3c78b4e75f",
+    "license": "CC0-1.0",
+    "url": "https://dataverse.harvard.edu/api/access/datafile/7144484",
+}
+for relation, source_hint, predicates, policy in [
+    ("molecule_associated_phenotype", "SIDER side-effect assertions flattened by PrimeKG/TxGNN", ["side effect"], "source-native broad molecule-to-phenotype side-effect association; non-causal"),
+    ("molecule_contraindicates_disease", "DrugCentral contraindication assertions flattened by PrimeKG/TxGNN", ["contraindication"], "negative/contraindication assertion only; never reuse positive indication evidence"),
+    ("molecule_parent_of_molecule", "Comparative Toxicogenomics Database exposure hierarchy flattened by PrimeKG/TxGNN", ["parent of"], "directed parent-to-child CTD chemical/exposure hierarchy; preserve source orientation"),
+    ("molecule_synergizes_molecule", "DrugBank drug-interaction assertions labeled `synergizes with` by PrimeKG/TxGNN", ["synergizes with"], "preserve the source pair orientation and label as legacy DrugBank interaction provenance; no combination-screen score, assay context, or threshold exists"),
+    ("molecule_treats_disease", "DrugCentral indication/off-label assertions plus CTD exposure-disease links flattened by PrimeKG/TxGNN", ["indication", "off-label use", "linked to"], "positive treatment/association assertion; original TxGNN edge lineage remains separate from later OpenTargets/ClinicalTrials support"),
 ]:
     SPECS[relation] = _spec(
-        [source_hint], ["remote-refetch-required", "source-selection-required"],
-        release_version="Exact accepted constituent file/release not yet pinned; Dataverse bundle DOI is known.",
-        license_access="Verify the selected Dataverse constituent license and redistribution terms before fetch/build.",
-        historical_identity="Current flat canonical object identity is frozen in relation-evidence-ledger.json; migration proves byte movement, not source replay.",
-        builder_status="original accepted builder/commit not recovered",
+        [source_hint], ["remote-refetch-required"],
+        release_version="TxGNN/DeepPurpose Dataverse v6.0, published 2023-06-07",
+        license_access="The accepted flattened kg.csv is CC0-1.0; upstream constituent release labels are not encoded and must not be invented.",
+        raw_objects=[TXGNN_KG_OBJECT],
+        historical_identity="Canonical generation is frozen in relation-evidence-ledger.json; source replay is bound to TxGNN kg.csv file 7144484 and the current canonical generation.",
+        builder_status="immutable task-scoped builder present; full parity remains review-required",
         assertion_policy=policy,
-        mapping_rejection_policy="Recover exact molecule/partner crosswalk, filters, rejected/unmapped/ambiguous rows, deduplication and orientation; compare candidate-only/canonical-only/intersection against the frozen canonical generation.",
-        evidence_fields=DEFAULT_EVIDENCE_FIELDS + ["source_predicate", "score", "threshold", "assay", "biological_context", "pair_orientation"],
-        next_rebuild_card="t_86299745 — rebuild all five molecule provenance-gap lineages after parent merge",
-        missing_artifacts=["release-pinned native constituent and checksum", "accepted crosswalk/quarantine manifest", "original immutable producer", "verified replay and parity/exception report"],
+        mapping_rejection_policy="Normalize typed DrugBank, CTD, HPO and MONDO endpoints exactly; quarantine unsupported predicates, malformed IDs and ambiguous/unmapped endpoints; preserve direction and source multiplicity; compare candidate-only/canonical-only/intersection against the frozen canonical generation.",
+        evidence_fields=DEFAULT_EVIDENCE_FIELDS + ["source_predicate", "original_x_id", "original_y_id", "pair_orientation", "symmetric"],
+        next_rebuild_card="t_86299745 — full worker replay, parity report and independent review",
+        missing_artifacts=["verified full worker replay and parity/exception report", "independent review"],
     )
+    SPECS[relation]["source_predicates"] = predicates
 
 SPECS["tf_binds_enhancer"] = _spec(
     ["ReMap observed all-peak ChIP binding", "ReMap CRM reconstructed support", "JASPAR/HOCOMOCO motif support only"],

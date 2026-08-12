@@ -8,6 +8,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 N4A_NOTEBOOK = REPO_ROOT / "reproduce" / "10_source_native_interactions_summary.ipynb"
 N4C_NOTEBOOK = REPO_ROOT / "reproduce" / "12_pharmacology_context_metadata_summary.ipynb"
 N4D_NOTEBOOK = REPO_ROOT / "reproduce" / "09_source_native_ingestion_index.ipynb"
+MOLECULE_GAP_NOTEBOOK = REPO_ROOT / "reproduce" / "30_molecule_provenance_gap_rebuild.ipynb"
 REPRODUCE_ROOT_NOTEBOOKS = [
     REPO_ROOT / "reproduce" / name
     for name in (
@@ -156,6 +157,20 @@ def test_n4d_source_native_l2_index_notebook_is_read_only_by_default() -> None:
     assert "no downloads" in text
     assert "no GCS writes" in text
     assert "no canonical KG writes" in text
+
+
+def test_molecule_gap_notebook_calls_real_builder_and_is_canonical_write_closed() -> None:
+    notebook, text = _notebook_text_for(MOLECULE_GAP_NOTEBOOK)
+    assert notebook["nbformat"] == 4
+    assert "ALLOW_CANONICAL_WRITES = False" in text
+    assert "manage_db.rebuild_molecule_provenance_gaps" in text
+    assert "write_replay(" in text
+    assert "10.7910/DVN/CNQV69" in text
+    assert "7144484" in text
+    assert "aac8191d4fbc5bf09cdf8c3c78b4e75f" in text
+    assert "TXGNN_MOLECULE_GAP_FIXTURE_REPLAY" in text
+    assert "TXGNN_MOLECULE_GAP_FULL_REPLAY" in text
+    assert "txgnn-worker" in text
 
 
 def test_n4d_source_native_l2_index_resolves_repo_root_from_reproduce(

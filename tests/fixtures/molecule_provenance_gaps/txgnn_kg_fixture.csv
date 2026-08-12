@@ -1,0 +1,10 @@
+x_id,x_type,x_source,y_id,y_type,y_source,relation,display_relation
+DB00001,drug,DrugBank,16,effect/phenotype,HPO,drug_effect,side effect
+DB00001,drug,DrugBank,16,effect/phenotype,HPO,drug_effect,side effect
+DB00001,drug,DrugBank,565,disease,MONDO,contraindication,contraindication
+C000188,exposure,CTD,D006540,exposure,CTD,exposure_exposure,parent of
+DB00001,drug,DrugBank,DB00006,drug,DrugBank,drug_drug,synergizes with
+DB00006,drug,DrugBank,DB00001,drug,DrugBank,drug_drug,synergizes with
+DB00002,drug,DrugBank,536,disease,MONDO,indication,indication
+C000188,exposure,CTD,2334,disease,MONDO,exposure_disease,linked to
+DB00001,drug,DrugBank,DB00002,drug,DrugBank,drug_drug,unknown predicate

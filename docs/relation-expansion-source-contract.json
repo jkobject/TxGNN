@@ -748,12 +748,11 @@
       "y_type": "gene"
     },
     {
-      "assertion_policy": "source-native broad molecule-to-phenotype association; non-causal",
+      "assertion_policy": "source-native broad molecule-to-phenotype side-effect association; non-causal",
       "availability_statuses": [
-        "remote-refetch-required",
-        "source-selection-required"
+        "remote-refetch-required"
       ],
-      "builder_status": "original accepted builder/commit not recovered",
+      "builder_status": "immutable task-scoped builder present; full parity remains review-required",
       "direct": false,
       "evidence_fields": [
         "source",
@@ -765,40 +764,51 @@
         "mapping_confidence",
         "license",
         "source_predicate",
-        "score",
-        "threshold",
-        "assay",
-        "biological_context",
-        "pair_orientation"
+        "original_x_id",
+        "original_y_id",
+        "pair_orientation",
+        "symmetric"
       ],
       "execution_placement": "bounded fixture/source audit on Mac; full or bulk build on txgnn-worker; task-scoped staging only",
-      "historical_identity": "Current flat canonical object identity is frozen in relation-evidence-ledger.json; migration proves byte movement, not source replay.",
+      "historical_identity": "Canonical generation is frozen in relation-evidence-ledger.json; source replay is bound to TxGNN kg.csv file 7144484 and the current canonical generation.",
       "kind": "pharmacological",
-      "license_access": "Verify the selected Dataverse constituent license and redistribution terms before fetch/build.",
-      "mapping_rejection_policy": "Recover exact molecule/partner crosswalk, filters, rejected/unmapped/ambiguous rows, deduplication and orientation; compare candidate-only/canonical-only/intersection against the frozen canonical generation.",
+      "license_access": "The accepted flattened kg.csv is CC0-1.0; upstream constituent release labels are not encoded and must not be invented.",
+      "mapping_rejection_policy": "Normalize typed DrugBank, CTD, HPO and MONDO endpoints exactly; quarantine unsupported predicates, malformed IDs and ambiguous/unmapped endpoints; preserve direction and source multiplicity; compare candidate-only/canonical-only/intersection against the frozen canonical generation.",
       "missing_artifacts": [
-        "release-pinned native constituent and checksum",
-        "accepted crosswalk/quarantine manifest",
-        "original immutable producer",
-        "verified replay and parity/exception report"
+        "verified full worker replay and parity/exception report",
+        "independent review"
       ],
-      "next_rebuild_card": "t_86299745 \u2014 rebuild all five molecule provenance-gap lineages after parent merge",
+      "next_rebuild_card": "t_86299745 \u2014 full worker replay, parity report and independent review",
       "preferred_sources": [
-        "TxData/TxGNN Dataverse DOI 10.7910/DVN/CNQV69 constituent side-effect/rescue source"
+        "SIDER side-effect assertions flattened by PrimeKG/TxGNN"
       ],
-      "raw_objects": [],
+      "raw_objects": [
+        {
+          "dataverse_file_id": "7144484",
+          "doi": "10.7910/DVN/CNQV69",
+          "filename": "kg.csv",
+          "license": "CC0-1.0",
+          "md5": "aac8191d4fbc5bf09cdf8c3c78b4e75f",
+          "published": "2023-06-07T04:55:16Z",
+          "size": 981751236,
+          "url": "https://dataverse.harvard.edu/api/access/datafile/7144484",
+          "version": "6.0"
+        }
+      ],
       "relation": "molecule_associated_phenotype",
-      "release_version": "Exact accepted constituent file/release not yet pinned; Dataverse bundle DOI is known.",
+      "release_version": "TxGNN/DeepPurpose Dataverse v6.0, published 2023-06-07",
+      "source_predicates": [
+        "side effect"
+      ],
       "x_type": "molecule",
       "y_type": "phenotype"
     },
     {
       "assertion_policy": "negative/contraindication assertion only; never reuse positive indication evidence",
       "availability_statuses": [
-        "remote-refetch-required",
-        "source-selection-required"
+        "remote-refetch-required"
       ],
-      "builder_status": "original accepted builder/commit not recovered",
+      "builder_status": "immutable task-scoped builder present; full parity remains review-required",
       "direct": false,
       "evidence_fields": [
         "source",
@@ -810,40 +820,51 @@
         "mapping_confidence",
         "license",
         "source_predicate",
-        "score",
-        "threshold",
-        "assay",
-        "biological_context",
-        "pair_orientation"
+        "original_x_id",
+        "original_y_id",
+        "pair_orientation",
+        "symmetric"
       ],
       "execution_placement": "bounded fixture/source audit on Mac; full or bulk build on txgnn-worker; task-scoped staging only",
-      "historical_identity": "Current flat canonical object identity is frozen in relation-evidence-ledger.json; migration proves byte movement, not source replay.",
+      "historical_identity": "Canonical generation is frozen in relation-evidence-ledger.json; source replay is bound to TxGNN kg.csv file 7144484 and the current canonical generation.",
       "kind": "pharmacological",
-      "license_access": "Verify the selected Dataverse constituent license and redistribution terms before fetch/build.",
-      "mapping_rejection_policy": "Recover exact molecule/partner crosswalk, filters, rejected/unmapped/ambiguous rows, deduplication and orientation; compare candidate-only/canonical-only/intersection against the frozen canonical generation.",
+      "license_access": "The accepted flattened kg.csv is CC0-1.0; upstream constituent release labels are not encoded and must not be invented.",
+      "mapping_rejection_policy": "Normalize typed DrugBank, CTD, HPO and MONDO endpoints exactly; quarantine unsupported predicates, malformed IDs and ambiguous/unmapped endpoints; preserve direction and source multiplicity; compare candidate-only/canonical-only/intersection against the frozen canonical generation.",
       "missing_artifacts": [
-        "release-pinned native constituent and checksum",
-        "accepted crosswalk/quarantine manifest",
-        "original immutable producer",
-        "verified replay and parity/exception report"
+        "verified full worker replay and parity/exception report",
+        "independent review"
       ],
-      "next_rebuild_card": "t_86299745 \u2014 rebuild all five molecule provenance-gap lineages after parent merge",
+      "next_rebuild_card": "t_86299745 \u2014 full worker replay, parity report and independent review",
       "preferred_sources": [
-        "TxData/TxGNN Dataverse contraindication constituent; otherwise a release-pinned contraindication-specific source"
+        "DrugCentral contraindication assertions flattened by PrimeKG/TxGNN"
       ],
-      "raw_objects": [],
+      "raw_objects": [
+        {
+          "dataverse_file_id": "7144484",
+          "doi": "10.7910/DVN/CNQV69",
+          "filename": "kg.csv",
+          "license": "CC0-1.0",
+          "md5": "aac8191d4fbc5bf09cdf8c3c78b4e75f",
+          "published": "2023-06-07T04:55:16Z",
+          "size": 981751236,
+          "url": "https://dataverse.harvard.edu/api/access/datafile/7144484",
+          "version": "6.0"
+        }
+      ],
       "relation": "molecule_contraindicates_disease",
-      "release_version": "Exact accepted constituent file/release not yet pinned; Dataverse bundle DOI is known.",
+      "release_version": "TxGNN/DeepPurpose Dataverse v6.0, published 2023-06-07",
+      "source_predicates": [
+        "contraindication"
+      ],
       "x_type": "molecule",
       "y_type": "disease"
     },
     {
-      "assertion_policy": "directed parent-to-child chemical hierarchy with explicit salt/mixture policy",
+      "assertion_policy": "directed parent-to-child CTD chemical/exposure hierarchy; preserve source orientation",
       "availability_statuses": [
-        "remote-refetch-required",
-        "source-selection-required"
+        "remote-refetch-required"
       ],
-      "builder_status": "original accepted builder/commit not recovered",
+      "builder_status": "immutable task-scoped builder present; full parity remains review-required",
       "direct": true,
       "evidence_fields": [
         "source",
@@ -855,40 +876,51 @@
         "mapping_confidence",
         "license",
         "source_predicate",
-        "score",
-        "threshold",
-        "assay",
-        "biological_context",
-        "pair_orientation"
+        "original_x_id",
+        "original_y_id",
+        "pair_orientation",
+        "symmetric"
       ],
       "execution_placement": "bounded fixture/source audit on Mac; full or bulk build on txgnn-worker; task-scoped staging only",
-      "historical_identity": "Current flat canonical object identity is frozen in relation-evidence-ledger.json; migration proves byte movement, not source replay.",
+      "historical_identity": "Canonical generation is frozen in relation-evidence-ledger.json; source replay is bound to TxGNN kg.csv file 7144484 and the current canonical generation.",
       "kind": "ontological",
-      "license_access": "Verify the selected Dataverse constituent license and redistribution terms before fetch/build.",
-      "mapping_rejection_policy": "Recover exact molecule/partner crosswalk, filters, rejected/unmapped/ambiguous rows, deduplication and orientation; compare candidate-only/canonical-only/intersection against the frozen canonical generation.",
+      "license_access": "The accepted flattened kg.csv is CC0-1.0; upstream constituent release labels are not encoded and must not be invented.",
+      "mapping_rejection_policy": "Normalize typed DrugBank, CTD, HPO and MONDO endpoints exactly; quarantine unsupported predicates, malformed IDs and ambiguous/unmapped endpoints; preserve direction and source multiplicity; compare candidate-only/canonical-only/intersection against the frozen canonical generation.",
       "missing_artifacts": [
-        "release-pinned native constituent and checksum",
-        "accepted crosswalk/quarantine manifest",
-        "original immutable producer",
-        "verified replay and parity/exception report"
+        "verified full worker replay and parity/exception report",
+        "independent review"
       ],
-      "next_rebuild_card": "t_86299745 \u2014 rebuild all five molecule provenance-gap lineages after parent merge",
+      "next_rebuild_card": "t_86299745 \u2014 full worker replay, parity report and independent review",
       "preferred_sources": [
-        "TxData/TxGNN Dataverse chemical hierarchy constituent"
+        "Comparative Toxicogenomics Database exposure hierarchy flattened by PrimeKG/TxGNN"
       ],
-      "raw_objects": [],
+      "raw_objects": [
+        {
+          "dataverse_file_id": "7144484",
+          "doi": "10.7910/DVN/CNQV69",
+          "filename": "kg.csv",
+          "license": "CC0-1.0",
+          "md5": "aac8191d4fbc5bf09cdf8c3c78b4e75f",
+          "published": "2023-06-07T04:55:16Z",
+          "size": 981751236,
+          "url": "https://dataverse.harvard.edu/api/access/datafile/7144484",
+          "version": "6.0"
+        }
+      ],
       "relation": "molecule_parent_of_molecule",
-      "release_version": "Exact accepted constituent file/release not yet pinned; Dataverse bundle DOI is known.",
+      "release_version": "TxGNN/DeepPurpose Dataverse v6.0, published 2023-06-07",
+      "source_predicates": [
+        "parent of"
+      ],
       "x_type": "molecule",
       "y_type": "molecule"
     },
     {
-      "assertion_policy": "screen-measured synergy with explicit score threshold, context, symmetry and pair orientation",
+      "assertion_policy": "preserve the source pair orientation and label as legacy DrugBank interaction provenance; no combination-screen score, assay context, or threshold exists",
       "availability_statuses": [
-        "remote-refetch-required",
-        "source-selection-required"
+        "remote-refetch-required"
       ],
-      "builder_status": "original accepted builder/commit not recovered",
+      "builder_status": "immutable task-scoped builder present; full parity remains review-required",
       "direct": false,
       "evidence_fields": [
         "source",
@@ -900,30 +932,42 @@
         "mapping_confidence",
         "license",
         "source_predicate",
-        "score",
-        "threshold",
-        "assay",
-        "biological_context",
-        "pair_orientation"
+        "original_x_id",
+        "original_y_id",
+        "pair_orientation",
+        "symmetric"
       ],
       "execution_placement": "bounded fixture/source audit on Mac; full or bulk build on txgnn-worker; task-scoped staging only",
-      "historical_identity": "Current flat canonical object identity is frozen in relation-evidence-ledger.json; migration proves byte movement, not source replay.",
+      "historical_identity": "Canonical generation is frozen in relation-evidence-ledger.json; source replay is bound to TxGNN kg.csv file 7144484 and the current canonical generation.",
       "kind": "pharmacological",
-      "license_access": "Verify the selected Dataverse constituent license and redistribution terms before fetch/build.",
-      "mapping_rejection_policy": "Recover exact molecule/partner crosswalk, filters, rejected/unmapped/ambiguous rows, deduplication and orientation; compare candidate-only/canonical-only/intersection against the frozen canonical generation.",
+      "license_access": "The accepted flattened kg.csv is CC0-1.0; upstream constituent release labels are not encoded and must not be invented.",
+      "mapping_rejection_policy": "Normalize typed DrugBank, CTD, HPO and MONDO endpoints exactly; quarantine unsupported predicates, malformed IDs and ambiguous/unmapped endpoints; preserve direction and source multiplicity; compare candidate-only/canonical-only/intersection against the frozen canonical generation.",
       "missing_artifacts": [
-        "release-pinned native constituent and checksum",
-        "accepted crosswalk/quarantine manifest",
-        "original immutable producer",
-        "verified replay and parity/exception report"
+        "verified full worker replay and parity/exception report",
+        "independent review"
       ],
-      "next_rebuild_card": "t_86299745 \u2014 rebuild all five molecule provenance-gap lineages after parent merge",
+      "next_rebuild_card": "t_86299745 \u2014 full worker replay, parity report and independent review",
       "preferred_sources": [
-        "TxData/TxGNN Dataverse combination-screen constituent(s)"
+        "DrugBank drug-interaction assertions labeled `synergizes with` by PrimeKG/TxGNN"
       ],
-      "raw_objects": [],
+      "raw_objects": [
+        {
+          "dataverse_file_id": "7144484",
+          "doi": "10.7910/DVN/CNQV69",
+          "filename": "kg.csv",
+          "license": "CC0-1.0",
+          "md5": "aac8191d4fbc5bf09cdf8c3c78b4e75f",
+          "published": "2023-06-07T04:55:16Z",
+          "size": 981751236,
+          "url": "https://dataverse.harvard.edu/api/access/datafile/7144484",
+          "version": "6.0"
+        }
+      ],
       "relation": "molecule_synergizes_molecule",
-      "release_version": "Exact accepted constituent file/release not yet pinned; Dataverse bundle DOI is known.",
+      "release_version": "TxGNN/DeepPurpose Dataverse v6.0, published 2023-06-07",
+      "source_predicates": [
+        "synergizes with"
+      ],
       "x_type": "molecule",
       "y_type": "molecule"
     },
@@ -969,12 +1013,11 @@
       "y_type": "protein"
     },
     {
-      "assertion_policy": "positive indication/treatment assertion; original edge lineage remains separate from later support",
+      "assertion_policy": "positive treatment/association assertion; original TxGNN edge lineage remains separate from later OpenTargets/ClinicalTrials support",
       "availability_statuses": [
-        "remote-refetch-required",
-        "source-selection-required"
+        "remote-refetch-required"
       ],
-      "builder_status": "original accepted builder/commit not recovered",
+      "builder_status": "immutable task-scoped builder present; full parity remains review-required",
       "direct": false,
       "evidence_fields": [
         "source",
@@ -986,30 +1029,44 @@
         "mapping_confidence",
         "license",
         "source_predicate",
-        "score",
-        "threshold",
-        "assay",
-        "biological_context",
-        "pair_orientation"
+        "original_x_id",
+        "original_y_id",
+        "pair_orientation",
+        "symmetric"
       ],
       "execution_placement": "bounded fixture/source audit on Mac; full or bulk build on txgnn-worker; task-scoped staging only",
-      "historical_identity": "Current flat canonical object identity is frozen in relation-evidence-ledger.json; migration proves byte movement, not source replay.",
+      "historical_identity": "Canonical generation is frozen in relation-evidence-ledger.json; source replay is bound to TxGNN kg.csv file 7144484 and the current canonical generation.",
       "kind": "pharmacological",
-      "license_access": "Verify the selected Dataverse constituent license and redistribution terms before fetch/build.",
-      "mapping_rejection_policy": "Recover exact molecule/partner crosswalk, filters, rejected/unmapped/ambiguous rows, deduplication and orientation; compare candidate-only/canonical-only/intersection against the frozen canonical generation.",
+      "license_access": "The accepted flattened kg.csv is CC0-1.0; upstream constituent release labels are not encoded and must not be invented.",
+      "mapping_rejection_policy": "Normalize typed DrugBank, CTD, HPO and MONDO endpoints exactly; quarantine unsupported predicates, malformed IDs and ambiguous/unmapped endpoints; preserve direction and source multiplicity; compare candidate-only/canonical-only/intersection against the frozen canonical generation.",
       "missing_artifacts": [
-        "release-pinned native constituent and checksum",
-        "accepted crosswalk/quarantine manifest",
-        "original immutable producer",
-        "verified replay and parity/exception report"
+        "verified full worker replay and parity/exception report",
+        "independent review"
       ],
-      "next_rebuild_card": "t_86299745 \u2014 rebuild all five molecule provenance-gap lineages after parent merge",
+      "next_rebuild_card": "t_86299745 \u2014 full worker replay, parity report and independent review",
       "preferred_sources": [
-        "original TxData/TxGNN Dataverse indication constituent; later OpenTargets/ClinicalTrials evidence is support only"
+        "DrugCentral indication/off-label assertions plus CTD exposure-disease links flattened by PrimeKG/TxGNN"
       ],
-      "raw_objects": [],
+      "raw_objects": [
+        {
+          "dataverse_file_id": "7144484",
+          "doi": "10.7910/DVN/CNQV69",
+          "filename": "kg.csv",
+          "license": "CC0-1.0",
+          "md5": "aac8191d4fbc5bf09cdf8c3c78b4e75f",
+          "published": "2023-06-07T04:55:16Z",
+          "size": 981751236,
+          "url": "https://dataverse.harvard.edu/api/access/datafile/7144484",
+          "version": "6.0"
+        }
+      ],
       "relation": "molecule_treats_disease",
-      "release_version": "Exact accepted constituent file/release not yet pinned; Dataverse bundle DOI is known.",
+      "release_version": "TxGNN/DeepPurpose Dataverse v6.0, published 2023-06-07",
+      "source_predicates": [
+        "indication",
+        "off-label use",
+        "linked to"
+      ],
       "x_type": "molecule",
       "y_type": "disease"
     },

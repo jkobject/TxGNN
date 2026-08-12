@@ -1257,6 +1257,8 @@ TXDATA_RELATION_MAP: dict[str, str] = {
     "exposure_bioprocess": "molecule_in_pathway",
     "exposure_molfunc": "molecule_in_pathway",
     "exposure_cellcomp": "molecule_in_pathway",
+    # Relation-name alone is ambiguous; kg_migrate specializes the source-native
+    # "parent of" predicate to molecule_parent_of_molecule.
     "exposure_exposure": "molecule_synergizes_molecule",
     "biomarker_disease": "disease_associated_gene",
 }

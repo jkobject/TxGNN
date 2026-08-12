@@ -128,3 +128,22 @@ def test_markdown_partner_links_machine_contract() -> None:
     text = MARKDOWN_CONTRACT.read_text()
     assert "relation-expansion-source-contract.json" in text
     assert "no data or canonical write authorization" in text
+
+
+def test_molecule_gap_contract_is_now_release_pinned_but_remains_review_gated() -> None:
+    expected_predicates = {
+        "molecule_associated_phenotype": ["side effect"],
+        "molecule_contraindicates_disease": ["contraindication"],
+        "molecule_parent_of_molecule": ["parent of"],
+        "molecule_synergizes_molecule": ["synergizes with"],
+        "molecule_treats_disease": ["indication", "off-label use", "linked to"],
+    }
+    for relation, predicates in expected_predicates.items():
+        row = _rows()[relation]
+        assert row["availability_statuses"] == ["remote-refetch-required"]
+        assert row["release_version"] == "TxGNN/DeepPurpose Dataverse v6.0, published 2023-06-07"
+        assert row["raw_objects"][0]["dataverse_file_id"] == "7144484"
+        assert row["raw_objects"][0]["md5"] == "aac8191d4fbc5bf09cdf8c3c78b4e75f"
+        assert row["source_predicates"] == predicates
+        assert row["builder_status"] == "immutable task-scoped builder present; full parity remains review-required"
+        assert "independent review" in row["missing_artifacts"]

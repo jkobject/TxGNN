@@ -23,6 +23,13 @@ STATUSES = {
     "historical-builder-only",
     "provenance-gap",
 }
+RELATION_PROVENANCE_GAP_IDS = {
+    "edges__molecule_associated_phenotype",
+    "edges__molecule_contraindicates_disease",
+    "edges__molecule_parent_of_molecule",
+    "edges__molecule_synergizes_molecule",
+    "edges__molecule_treats_disease",
+}
 
 RAW_OBJECTS = {
     "biogrid": ["gs://jouvencekb/raw/biogrid_SYSTEM_5.0.258.tab3.zip"],
@@ -54,15 +61,15 @@ FAMILIES: dict[str, dict[str, Any]] = {
     },
     "txgnn_legacy": {
         "label": "TxData/TxGNN legacy source bundle",
-        "release": "TxData Dataverse DOI 10.7910/DVN/CNQV69; constituent upstream releases vary and are not always recoverable",
-        "native_inputs": ["https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/CNQV69"],
-        "builder": "manage_db/export_kg.py",
-        "command": None,
+        "release": "TxGNN/DeepPurpose Dataverse v6.0 kg.csv, file 7144484, published 2023-06-07, MD5 aac8191d4fbc5bf09cdf8c3c78b4e75f; constituent upstream releases are not encoded",
+        "native_inputs": ["https://dataverse.harvard.edu/api/access/datafile/7144484"],
+        "builder": "manage_db/rebuild_molecule_provenance_gaps.py",
+        "command": "uv run python -m manage_db.rebuild_molecule_provenance_gaps --acquire-to artifacts/cache/<task-id>/txgnn_kg_file_7144484.csv --output-dir artifacts/staged/<task-id>/molecule-provenance-gaps --canonical-dir <worker-local-main> --canonical-manifest artifacts/cache/<task-id>/canonical-snapshot-manifest.json",
         "mappings": "Normalize legacy node and endpoint identifiers to the declared Jouvence namespaces while preserving source labels and typed endpoints.",
         "transformations": "Export legacy source tables into typed nodes, deduplicated edge assertions and evidence where recoverable.",
         "exclusions": "Do not infer missing evidence, source releases or endpoint projections from a legacy relation name.",
-        "problems": "The immutable Dataverse identity is known, but the complete accepted acquisition/build argv and several constituent source releases are not tracked.",
-        "links": ["reproduce/06_build_core_edges_and_evidence.ipynb", "reproduce/26_source_reproduction_index.ipynb", "manage_db/export_kg.py"],
+        "problems": "The five molecule lineages now have an immutable flattened-source builder and exact TxGNN file identity; they remain provenance-gap until full parity/exception evidence and independent review. Other legacy family outputs retain historical-only lineage.",
+        "links": ["reproduce/06_build_core_edges_and_evidence.ipynb", "reproduce/26_source_reproduction_index.ipynb", "reproduce/30_molecule_provenance_gap_rebuild.ipynb", "manage_db/rebuild_molecule_provenance_gaps.py"],
     },
     "cellosaurus": {
         "label": "Cellosaurus identity and text",
@@ -270,6 +277,7 @@ FAMILY_NOTEBOOKS = {
 # code is still linked as context, but is not promoted to `producer` unless the
 # tracked implementation actually emits that exact output.
 EXACT_PRODUCERS = {
+    **{dataset_id: "manage_db/rebuild_molecule_provenance_gaps.py" for dataset_id in RELATION_PROVENANCE_GAP_IDS},
     "features__cell_line_textual_summary": "manage_db/build_textual_summary_features.py",
     "edges__cell_line_gene_essentiality": "manage_db/build_staged_cell_line_assays.py",
     "evidence__cell_line_gene_essentiality": "manage_db/build_staged_cell_line_assays.py",
@@ -291,6 +299,7 @@ EXACT_PRODUCERS = {
 }
 
 EXACT_COMMANDS = {
+    **{dataset_id: FAMILIES["txgnn_legacy"]["command"] for dataset_id in RELATION_PROVENANCE_GAP_IDS},
     "features__cell_line_textual_summary": FAMILIES["cellosaurus"]["command"],
     "features__transcript_sequence": FAMILIES["ensembl"]["command"],
     "features__phenotype_textual_summary": FAMILIES["hpo"]["command"],
@@ -303,13 +312,6 @@ OPEN_TARGETS_PREFIXES = (
     "disease_associated_", "disease_involves_", "disease_manifests_",
     "enhancer_regulates_", "gene_interacts_", "mutation_", "molecule_targets_",
 )
-RELATION_PROVENANCE_GAP_IDS = {
-    "edges__molecule_associated_phenotype",
-    "edges__molecule_contraindicates_disease",
-    "edges__molecule_parent_of_molecule",
-    "edges__molecule_synergizes_molecule",
-    "edges__molecule_treats_disease",
-}
 PROVENANCE_GAP_IDS = {
     "nodes__dataset", "nodes__paper", "edges__molecule_associated_phenotype",
     "edges__molecule_contraindicates_disease", "edges__molecule_parent_of_molecule",
