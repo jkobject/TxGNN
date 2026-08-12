@@ -41,6 +41,7 @@ NO_EVIDENCE_ROUTES = {
         "disease_subtype_of_disease",
         "phenotype_subtype_of_phenotype",
         "tissue_subtype_of_tissue",
+        "organism_has_gene",
         "organism_has_tissue",
     },
     "evidence-backfill-source-known": {
@@ -48,7 +49,6 @@ NO_EVIDENCE_ROUTES = {
         "disease_has_phenotype",
         "gene_associated_phenotype",
         "molecule_in_pathway",
-        "organism_has_gene",
     },
     "provenance-recovery-required": {
         "molecule_associated_phenotype",
@@ -114,6 +114,11 @@ SPECIAL_NEXT_ACTIONS = {
     "molecule_synergizes_molecule": "Recover exact screen files, score threshold, context and pair-orientation policy before an evidence audit.",
     "molecule_treats_disease": "Partition supported/unsupported edge keys and recover the original indication lineage before replacement.",
     "cell_line_responds_to_molecule": "Refetch the five checksum-pinned PRISM files and create a new task-scoped candidate; deleted staging is not promotable.",
+    "organism_has_gene": "Retain the accepted structural/reference exception and record table-level source/release provenance; never fabricate row evidence.",
+    "tissue_expresses_gene": "Retain non-zero topology; recover numeric expression and add deterministic source/context-specific low|medium|high quantile bins with exact groups and cutoffs.",
+    "cell_type_expresses_gene": "Retain non-zero topology; recover numeric expression and add deterministic source/context-specific low|medium|high quantile bins with exact groups and cutoffs.",
+    "cell_line_expresses_gene": "Retain non-zero topology; recover numeric expression and add deterministic source/context-specific low|medium|high quantile bins with exact groups and cutoffs.",
+    "tf_regulates_gene": "Keep absent as an observed table; only a reviewed context-compatible tf_binds_enhancer + enhancer_regulates_gene derivation may enter inferred tables with full path evidence.",
 }
 
 ROUTE_ACTIONS = {

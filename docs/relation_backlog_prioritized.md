@@ -13,19 +13,23 @@ and `24` active schema relations without canonical edge.
 
 Every relation is routed exactly once. Missing evidence is not uniformly a defect.
 
-### Accepted no-evidence structural/ontological (7)
+### Accepted no-evidence structural/ontological (8)
 
 `gene_has_transcript`, `transcript_encodes_protein`, `pathway_child_of_pathway`,
 `disease_subtype_of_disease`, `phenotype_subtype_of_phenotype`,
-`tissue_subtype_of_tissue`, `organism_has_tissue`.
+`tissue_subtype_of_tissue`, `organism_has_gene`, `organism_has_tissue`.
 
 Terminal route: retain the documented exception. Add evidence only from a
 release-pinned source; never create placeholder evidence.
 
-### Evidence backfill, source known (5)
+For `organism_has_gene`, this means exact table-level taxonomy/gene-registry
+source and release provenance. It is an accepted structural/reference exception;
+do not fabricate row evidence.
+
+### Evidence backfill, source known (4)
 
 `cell_line_derived_from_tissue`, `disease_has_phenotype`,
-`gene_associated_phenotype`, `molecule_in_pathway`, `organism_has_gene`.
+`gene_associated_phenotype`, `molecule_in_pathway`.
 
 Next bounded action: stage evidence against the unchanged canonical edge generation,
 then verify relation/endpoint support, source release, mapping and exceptions.
@@ -97,6 +101,12 @@ or path, generation/checksum, producer commit and validation receipt.
 For `cell_line_responds_to_molecule`, PR #15 is historical builder evidence only.
 A reprise starts by refetching the five checksum-pinned PRISM 20Q2 files and
 producing a new task-scoped candidate; deleted staging is never promotable.
+
+The reviewed expansion/recovery inputs for every row in this section are frozen
+in [`relation-expansion-source-contract.md`](relation-expansion-source-contract.md)
+and its deterministic JSON partner. That contract also preserves the ReMap pilot,
+protein-native candidates, expression-value/quantile policy, RNA endpoint gates,
+Cell Ontology/Cellosaurus candidates, and explicit source-selection gaps.
 
 ## Candidate/non-active relations
 
