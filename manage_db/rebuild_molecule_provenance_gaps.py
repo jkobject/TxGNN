@@ -8,13 +8,16 @@ small fixture replay is supported locally.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import hashlib
 import json
 import os
 import socket
+import time
 import urllib.request
 import uuid
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Iterator
 
@@ -138,6 +141,15 @@ class BuildResult:
     rejections: pd.DataFrame
 
 
+@dataclass(frozen=True)
+class RunAdmission:
+    receipt_path: Path
+    heartbeat_path: Path
+    lock_path: Path
+    lease_until: datetime
+    max_runtime_seconds: int
+
+
 def file_md5(path: Path) -> str:
     digest = hashlib.md5(usedforsecurity=False)
     with path.open("rb") as handle:
@@ -154,12 +166,133 @@ def file_sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _object_identity(path: Path) -> dict[str, object]:
+    return {"size": path.stat().st_size, "sha256": file_sha256(path)}
+
+
+def _reject_dangerous_path(path: Path, *, label: str) -> Path:
+    raw = str(path)
+    resolved = path.resolve(strict=False)
+    lowered_parts = {part.lower() for part in resolved.parts}
+    if (
+        raw.startswith("gs://")
+        or raw.startswith("/Users/jkobject/mnt/gcs")
+        or "main" in lowered_parts
+        or "canonical" in lowered_parts
+    ):
+        raise ValueError(f"forbidden {label} path: {path}")
+    return resolved
+
+
+def _validate_output_path(output_dir: Path, *, fixture: bool, fixture_allowed_root: Path | None) -> None:
+    resolved_output = _reject_dangerous_path(output_dir, label="output")
+    if fixture:
+        if fixture_allowed_root is None:
+            raise ValueError("fixture_allowed_root is required for fixture replay")
+        allowed_root = _reject_dangerous_path(fixture_allowed_root, label="fixture root")
+        if resolved_output == allowed_root or not resolved_output.is_relative_to(allowed_root):
+            raise ValueError("fixture output must be a child of fixture_allowed_root")
+        return
+    allowed_root = (Path.cwd() / "artifacts" / "staged" / "t_86299745").resolve(strict=False)
+    if not resolved_output.is_relative_to(allowed_root) or resolved_output == allowed_root:
+        raise ValueError("full replay output must be under artifacts/staged/t_86299745/")
+
+
+def _parse_timestamp(value: object, field: str) -> datetime:
+    try:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise ValueError(f"launcher receipt has invalid {field}") from exc
+    if parsed.tzinfo is None:
+        raise ValueError(f"launcher receipt {field} must be timezone-aware")
+    return parsed.astimezone(UTC)
+
+
+def validate_launcher_receipt(path: Path) -> RunAdmission:
+    """Validate a fresh readback from the project-approved lifecycle launcher."""
+    if not path.is_file():
+        raise ValueError("full replay requires a launcher receipt")
+    receipt = json.loads(path.read_text())
+    expected = {
+        "task_id": "t_86299745",
+        "owner": os.environ.get("USER", "jkobject"),
+        "project": "jouvence",
+        "purpose": "molecule-provenance-gap-full-replay",
+        "hostname": "txgnn-worker",
+    }
+    for field, value in expected.items():
+        if receipt.get(field) != value:
+            raise ValueError(f"launcher receipt {field} must equal {value!r}")
+    now = datetime.now(UTC)
+    readback_at = _parse_timestamp(receipt.get("readback_at"), "readback_at")
+    lease_until = _parse_timestamp(receipt.get("lease_until"), "lease_until")
+    if abs((now - readback_at).total_seconds()) > 300:
+        raise ValueError("launcher receipt readback is not fresh")
+    max_runtime = receipt.get("max_runtime_seconds")
+    if not isinstance(max_runtime, int) or not 60 <= max_runtime <= 86_400:
+        raise ValueError("launcher receipt max_runtime_seconds must be an integer in [60, 86400]")
+    if lease_until.timestamp() < time.time() + max_runtime + 600:
+        raise ValueError("launcher lease does not cover max runtime plus cleanup margin")
+    heartbeat = Path(str(receipt.get("payload_heartbeat_path", "")))
+    lock = Path(str(receipt.get("resource_lock_path", "")))
+    if not heartbeat.is_absolute() or not lock.is_absolute():
+        raise ValueError("launcher receipt heartbeat and lock paths must be absolute")
+    for candidate in (heartbeat, lock):
+        _reject_dangerous_path(candidate, label="runtime")
+    return RunAdmission(path, heartbeat, lock, lease_until, max_runtime)
+
+
+@contextlib.contextmanager
+def _exclusive_run(admission: RunAdmission | None) -> Iterator[None]:
+    if admission is None:
+        yield
+        return
+    admission.lock_path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor = os.open(admission.lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+    try:
+        os.write(descriptor, f"{os.getpid()}\n".encode())
+        os.close(descriptor)
+        descriptor = -1
+        yield
+    finally:
+        if descriptor >= 0:
+            with contextlib.suppress(OSError):
+                os.close(descriptor)
+        admission.lock_path.unlink(missing_ok=True)
+
+
+def _payload_heartbeat(admission: RunAdmission | None, *, started: float, source_rows: int) -> None:
+    if admission is None:
+        return
+    elapsed = time.monotonic() - started
+    if elapsed > admission.max_runtime_seconds or datetime.now(UTC) >= admission.lease_until:
+        raise TimeoutError("full replay exceeded its admitted runtime/lease")
+    admission.heartbeat_path.parent.mkdir(parents=True, exist_ok=True)
+    partial = admission.heartbeat_path.with_suffix(".partial")
+    partial.write_text(
+        json.dumps(
+            {
+                "task_id": "t_86299745",
+                "payload_pid": os.getpid(),
+                "source_rows": source_rows,
+                "elapsed_seconds": round(elapsed, 3),
+                "updated_at": datetime.now(UTC).isoformat(),
+            },
+            sort_keys=True,
+        )
+        + "\n"
+    )
+    os.replace(partial, admission.heartbeat_path)
+
+
 def acquire_source(
     url: str,
     destination: Path,
     *,
     expected_size: int = TXGNN_DATASET["size"],
     expected_md5: str = TXGNN_DATASET["md5"],
+    admission: RunAdmission | None = None,
+    started: float | None = None,
 ) -> dict[str, object]:
     """Create-only streamed acquisition with validation before atomic adoption."""
     if destination.exists():
@@ -174,6 +307,11 @@ def acquire_source(
                 handle.write(chunk)
                 digest.update(chunk)
                 size += len(chunk)
+                _payload_heartbeat(
+                    admission,
+                    started=started if started is not None else time.monotonic(),
+                    source_rows=size,
+                )
             handle.flush()
             os.fsync(handle.fileno())
         observed_md5 = digest.hexdigest()
@@ -280,6 +418,7 @@ def build_candidates(source_rows: pd.DataFrame, *, source_offset_start: int = 0)
             rejected.append(
                 {
                     "source_offset": source_offset,
+                    "target_relation": relation,
                     "legacy_relation": legacy_relation,
                     "source_predicate": predicate,
                     "reason": "unsupported_assertion",
@@ -293,6 +432,7 @@ def build_candidates(source_rows: pd.DataFrame, *, source_offset_start: int = 0)
             rejected.append(
                 {
                     "source_offset": source_offset,
+                    "target_relation": relation,
                     "legacy_relation": legacy_relation,
                     "source_predicate": predicate,
                     "reason": (
@@ -309,6 +449,7 @@ def build_candidates(source_rows: pd.DataFrame, *, source_offset_start: int = 0)
             rejected.append(
                 {
                     "source_offset": source_offset,
+                    "target_relation": relation,
                     "legacy_relation": legacy_relation,
                     "source_predicate": predicate,
                     "reason": (
@@ -326,6 +467,7 @@ def build_candidates(source_rows: pd.DataFrame, *, source_offset_start: int = 0)
             rejected.append(
                 {
                     "source_offset": source_offset,
+                    "target_relation": relation,
                     "legacy_relation": legacy_relation,
                     "source_predicate": predicate,
                     "reason": f"mapping_failure:{exc}",
@@ -438,17 +580,18 @@ def write_replay(
     output_dir: Path,
     *,
     fixture: bool,
+    fixture_allowed_root: Path | None = None,
     canonical_dir: Path | None,
     canonical_manifest: Path | None = None,
     chunksize: int,
+    admission: RunAdmission | None = None,
+    started: float | None = None,
 ) -> None:
-    if not fixture:
-        if socket.gethostname() != "txgnn-worker":
-            raise RuntimeError("full replay must run on txgnn-worker")
-        resolved_output = output_dir.resolve(strict=False)
-        allowed_root = (Path.cwd() / "artifacts" / "staged" / "t_86299745").resolve(strict=False)
-        if not resolved_output.is_relative_to(allowed_root) or resolved_output == allowed_root:
-            raise ValueError("full replay output must be under artifacts/staged/t_86299745/")
+    if not fixture and socket.gethostname() != "txgnn-worker":
+        raise RuntimeError("full replay must run on txgnn-worker")
+    _validate_output_path(output_dir, fixture=fixture, fixture_allowed_root=fixture_allowed_root)
+    if not fixture and admission is None:
+        raise ValueError("full replay requires a validated launcher receipt")
     snapshot_manifest = None
     if canonical_dir is not None:
         if canonical_manifest is None or not canonical_manifest.is_file():
@@ -476,9 +619,11 @@ def write_replay(
     source_identity = verify_source(source, allow_fixture=fixture)
     chunks = []
     source_offset = 0
+    started = started if started is not None else time.monotonic()
     for chunk in iter_csv(source, chunksize):
         chunks.append(build_candidates(chunk, source_offset_start=source_offset))
         source_offset += len(chunk)
+        _payload_heartbeat(admission, started=started, source_rows=source_offset)
     if not chunks:
         raise ValueError("source kg.csv contains no rows")
     combined = BuildResult(
@@ -505,6 +650,34 @@ def write_replay(
         combined.evidence[relation].to_parquet(output_dir / "evidence" / f"{relation}.parquet", index=False)
     combined.rejections.to_parquet(output_dir / "mapping_quarantine.parquet", index=False)
 
+    relation_stats = {}
+    rejection_relations = combined.rejections.get("target_relation", pd.Series(dtype=object))
+    for relation in SOURCE_ASSERTIONS:
+        evidence = combined.evidence[relation]
+        relation_rejections = combined.rejections[rejection_relations == relation]
+        reasons = relation_rejections.get("reason", pd.Series(dtype=str)).value_counts().sort_index()
+        relation_stats[relation] = {
+            **SOURCE_ASSERTIONS[relation],
+            "canonical_generation": CANONICAL_GENERATIONS[relation],
+            "source_selected_rows": len(evidence) + len(relation_rejections),
+            "accepted_rows": len(evidence),
+            "source_duplicate_assertions": int(
+                evidence.duplicated(["relation", "x_id", "y_id"], keep="first").sum()
+            ),
+            "distinct_edge_keys": len(combined.edges[relation]),
+            "evidence_rows": len(evidence),
+            "distinct_evidence_ids": int(evidence["source_record_id"].nunique()),
+            "rejected_rows": len(relation_rejections),
+            "mapping_failure_rows": int(reasons[reasons.index.str.startswith("mapping_failure:")].sum()),
+            "rejections_by_reason": {str(reason): int(count) for reason, count in reasons.items()},
+        }
+
+    output_paths = [output_dir / "mapping_quarantine.parquet"]
+    output_paths.extend(
+        output_dir / kind / f"{relation}.parquet"
+        for kind in ("edges", "evidence")
+        for relation in SOURCE_ASSERTIONS
+    )
     manifest: dict[str, object] = {
         "task_id": "t_86299745",
         "status": "staged-only",
@@ -512,16 +685,12 @@ def write_replay(
         "source_contract": TXGNN_DATASET,
         "source_identity": source_identity,
         "canonical_snapshot_manifest": str(canonical_manifest) if canonical_manifest else None,
-        "relations": {
-            relation: {
-                **SOURCE_ASSERTIONS[relation],
-                "canonical_generation": CANONICAL_GENERATIONS[relation],
-                "edge_rows": len(combined.edges[relation]),
-                "evidence_rows": len(combined.evidence[relation]),
-            }
-            for relation in SOURCE_ASSERTIONS
-        },
+        "relations": relation_stats,
         "mapping_quarantine_rows": len(combined.rejections),
+        "objects": {
+            str(path.relative_to(output_dir)): _object_identity(path)
+            for path in sorted(output_paths)
+        },
     }
 
     if canonical_dir is not None:
@@ -542,10 +711,35 @@ def write_replay(
                 y_endpoints=node_cache[y_type],
                 later_support=later_support if relation == "molecule_treats_disease" else None,
             )
+            parity[relation].update(relation_stats[relation])
         (output_dir / "parity_report.json").write_text(json.dumps(parity, indent=2, sort_keys=True) + "\n")
         manifest["parity_report"] = "parity_report.json"
+        object_manifest = manifest["objects"]
+        assert isinstance(object_manifest, dict)
+        object_manifest["parity_report.json"] = _object_identity(output_dir / "parity_report.json")
 
     (output_dir / "manifest.json").write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n")
+
+
+def verify_replay(output_dir: Path) -> dict[str, object]:
+    """Read back every manifest-bound replay object and reject extra/mutated bytes."""
+    manifest_path = output_dir / "manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    objects = manifest.get("objects")
+    if not isinstance(objects, dict) or not objects:
+        raise ValueError("replay manifest has no object identities")
+    for relative_path, identity in objects.items():
+        path = output_dir / relative_path
+        if not path.is_file() or identity != _object_identity(path):
+            raise ValueError(f"replay object identity mismatch: {relative_path}")
+    actual = {
+        str(path.relative_to(output_dir))
+        for path in output_dir.rglob("*")
+        if path.is_file() and path != manifest_path
+    }
+    if actual != set(objects):
+        raise ValueError("replay object inventory mismatch")
+    return manifest
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -556,22 +750,54 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--canonical-dir", type=Path, help="Read-only flat canonical snapshot for parity")
     parser.add_argument("--canonical-manifest", type=Path, help="Snapshot identity with exact frozen edge generations")
     parser.add_argument("--fixture", action="store_true", help="Permit a bounded fixture instead of exact source bytes")
+    parser.add_argument("--fixture-allowed-root", type=Path, help="Explicit safe root for test-only fixture output")
+    parser.add_argument("--launcher-receipt", type=Path, help="Fresh lifecycle launcher lease readback for full replay")
     parser.add_argument("--chunksize", type=int, default=250_000)
     args = parser.parse_args(argv)
     if (args.source is None) == (args.acquire_to is None):
         parser.error("provide exactly one of --source or --acquire-to")
+    admission = None
+    if args.fixture:
+        if args.acquire_to is not None:
+            parser.error("fixture replay requires --source; it cannot acquire the full release")
+        _validate_output_path(
+            args.output_dir,
+            fixture=True,
+            fixture_allowed_root=args.fixture_allowed_root,
+        )
+    else:
+        if socket.gethostname() != "txgnn-worker":
+            raise RuntimeError("full replay must run on txgnn-worker")
+        _validate_output_path(args.output_dir, fixture=False, fixture_allowed_root=None)
+        admission = validate_launcher_receipt(args.launcher_receipt or Path(""))
+        if args.acquire_to is not None:
+            _reject_dangerous_path(args.acquire_to, label="acquisition")
+        if args.source is not None:
+            _reject_dangerous_path(args.source, label="source")
     source = args.source
-    if args.acquire_to is not None:
-        acquire_source(TXGNN_DATASET["url"], args.acquire_to)
-        source = args.acquire_to
-    write_replay(
-        source,
-        args.output_dir,
-        fixture=args.fixture,
-        canonical_dir=args.canonical_dir,
-        canonical_manifest=args.canonical_manifest,
-        chunksize=args.chunksize,
-    )
+    with _exclusive_run(admission):
+        started = time.monotonic()
+        if args.acquire_to is not None:
+            acquire_source(
+                TXGNN_DATASET["url"],
+                args.acquire_to,
+                admission=admission,
+                started=started,
+            )
+            source = args.acquire_to
+        assert source is not None
+        write_replay(
+            source,
+            args.output_dir,
+            fixture=args.fixture,
+            fixture_allowed_root=args.fixture_allowed_root,
+            canonical_dir=args.canonical_dir,
+            canonical_manifest=args.canonical_manifest,
+            chunksize=args.chunksize,
+            admission=admission,
+            started=started,
+        )
+        verify_replay(args.output_dir)
 
 
 if __name__ == "__main__":

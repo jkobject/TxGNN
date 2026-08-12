@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import json
+from datetime import UTC, datetime, timedelta
+
 import pandas as pd
 import pytest
 import manage_db.rebuild_molecule_provenance_gaps as rebuild
@@ -10,6 +13,8 @@ from manage_db.rebuild_molecule_provenance_gaps import (
     acquire_source,
     build_candidates,
     compare_candidate,
+    validate_launcher_receipt,
+    verify_replay,
     write_replay,
 )
 
@@ -201,7 +206,14 @@ def test_chunked_replay_keeps_globally_unique_source_record_ids(tmp_path) -> Non
     fixture_rows().iloc[:2].to_csv(source, index=False)
 
     output = tmp_path / "candidate"
-    write_replay(source, output, fixture=True, canonical_dir=None, chunksize=1)
+    write_replay(
+        source,
+        output,
+        fixture=True,
+        fixture_allowed_root=tmp_path,
+        canonical_dir=None,
+        chunksize=1,
+    )
 
     evidence = pd.read_parquet(output / "evidence" / "molecule_associated_phenotype.parquet")
     assert evidence["source_record_id"].tolist() == ["TxGNN:kg.csv:0", "TxGNN:kg.csv:1"]
@@ -298,6 +310,81 @@ def test_full_replay_refuses_non_worker_and_non_staging_output(tmp_path, monkeyp
         write_replay(source, escape, fixture=False, canonical_dir=canonical, chunksize=2)
 
 
+def test_fixture_replay_requires_explicit_safe_root_and_rejects_canonical_shaped_paths(tmp_path) -> None:
+    source = tmp_path / "kg.csv"
+    fixture_rows().to_csv(source, index=False)
+
+    with pytest.raises(ValueError, match="fixture_allowed_root"):
+        write_replay(source, tmp_path / "candidate", fixture=True, canonical_dir=None, chunksize=2)
+    with pytest.raises(ValueError, match="forbidden output path"):
+        write_replay(
+            source,
+            tmp_path / "main" / "edges" / "unsafe",
+            fixture=True,
+            fixture_allowed_root=tmp_path,
+            canonical_dir=None,
+            chunksize=2,
+        )
+
+
+def test_full_cli_preflight_runs_before_acquisition(tmp_path, monkeypatch) -> None:
+    called = False
+
+    def forbidden_acquisition(*args, **kwargs):
+        nonlocal called
+        called = True
+        raise AssertionError("acquisition must not run before admission")
+
+    monkeypatch.setattr(rebuild, "acquire_source", forbidden_acquisition)
+    monkeypatch.setattr(rebuild.socket, "gethostname", lambda: "laptop")
+    with pytest.raises(RuntimeError, match="txgnn-worker"):
+        rebuild.main(
+            [
+                "--acquire-to",
+                str(tmp_path / "raw" / "kg.csv"),
+                "--output-dir",
+                str(tmp_path / "candidate"),
+            ]
+        )
+    assert called is False
+
+
+def test_launcher_receipt_requires_fresh_bounded_task_lease_and_exclusive_lock(tmp_path, monkeypatch) -> None:
+    now = datetime.now(UTC)
+    heartbeat = tmp_path / "runtime" / "heartbeat.json"
+    lock = tmp_path / "runtime" / "writer.lock"
+    receipt = tmp_path / "launcher-receipt.json"
+    receipt.write_text(
+        json.dumps(
+            {
+                "task_id": "t_86299745",
+                "owner": "tester",
+                "project": "jouvence",
+                "purpose": "molecule-provenance-gap-full-replay",
+                "hostname": "txgnn-worker",
+                "readback_at": now.isoformat(),
+                "lease_until": (now + timedelta(hours=2)).isoformat(),
+                "max_runtime_seconds": 3600,
+                "payload_heartbeat_path": str(heartbeat),
+                "resource_lock_path": str(lock),
+            }
+        )
+    )
+    monkeypatch.setenv("USER", "tester")
+    admission = validate_launcher_receipt(receipt)
+    lock.parent.mkdir(parents=True)
+    lock.write_text("existing writer\n")
+    with pytest.raises(FileExistsError):
+        with rebuild._exclusive_run(admission):
+            pass
+
+    receipt_payload = json.loads(receipt.read_text())
+    receipt_payload["readback_at"] = (now - timedelta(minutes=10)).isoformat()
+    receipt.write_text(json.dumps(receipt_payload))
+    with pytest.raises(ValueError, match="not fresh"):
+        validate_launcher_receipt(receipt)
+
+
 def test_parity_requires_a_snapshot_manifest_with_frozen_edge_generations(tmp_path) -> None:
     source = tmp_path / "kg.csv"
     fixture_rows().to_csv(source, index=False)
@@ -309,6 +396,7 @@ def test_parity_requires_a_snapshot_manifest_with_frozen_edge_generations(tmp_pa
             source,
             tmp_path / "candidate",
             fixture=True,
+            fixture_allowed_root=tmp_path,
             canonical_dir=canonical,
             canonical_manifest=None,
             chunksize=2,
@@ -341,7 +429,39 @@ def test_snapshot_manifest_must_bind_actual_file_bytes(tmp_path) -> None:
             source,
             tmp_path / "candidate",
             fixture=True,
+            fixture_allowed_root=tmp_path,
             canonical_dir=canonical,
             canonical_manifest=manifest,
             chunksize=2,
         )
+
+
+def test_manifest_binds_all_outputs_and_verifier_detects_tampering(tmp_path) -> None:
+    source = tmp_path / "kg.csv"
+    fixture_rows().to_csv(source, index=False)
+    output = tmp_path / "candidate"
+    write_replay(
+        source,
+        output,
+        fixture=True,
+        fixture_allowed_root=tmp_path,
+        canonical_dir=None,
+        chunksize=2,
+    )
+
+    manifest = verify_replay(output)
+    assert len(manifest["objects"]) == 11
+    assert "mapping_quarantine.parquet" in manifest["objects"]
+    relation = manifest["relations"]["molecule_associated_phenotype"]
+    assert relation["source_selected_rows"] == 2
+    assert relation["accepted_rows"] == 2
+    assert relation["source_duplicate_assertions"] == 1
+    assert relation["distinct_edge_keys"] == 1
+    assert relation["evidence_rows"] == 2
+    assert relation["distinct_evidence_ids"] == 2
+    assert relation["rejected_rows"] == 0
+
+    target = output / "evidence" / "molecule_associated_phenotype.parquet"
+    target.write_bytes(target.read_bytes() + b"tamper")
+    with pytest.raises(ValueError, match="replay object identity mismatch"):
+        verify_replay(output)

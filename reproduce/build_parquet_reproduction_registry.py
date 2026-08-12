@@ -64,7 +64,7 @@ FAMILIES: dict[str, dict[str, Any]] = {
         "release": "TxGNN/DeepPurpose Dataverse v6.0 kg.csv, file 7144484, published 2023-06-07, MD5 aac8191d4fbc5bf09cdf8c3c78b4e75f; constituent upstream releases are not encoded",
         "native_inputs": ["https://dataverse.harvard.edu/api/access/datafile/7144484"],
         "builder": "manage_db/rebuild_molecule_provenance_gaps.py",
-        "command": "uv run python -m manage_db.rebuild_molecule_provenance_gaps --acquire-to artifacts/cache/<task-id>/txgnn_kg_file_7144484.csv --output-dir artifacts/staged/<task-id>/molecule-provenance-gaps --canonical-dir <worker-local-main> --canonical-manifest artifacts/cache/<task-id>/canonical-snapshot-manifest.json",
+        "command": "uv run python -m manage_db.rebuild_molecule_provenance_gaps --acquire-to artifacts/cache/<task-id>/txgnn_kg_file_7144484.csv --output-dir artifacts/staged/<task-id>/molecule-provenance-gaps --canonical-dir <worker-local-main> --canonical-manifest artifacts/cache/<task-id>/canonical-snapshot-manifest.json --launcher-receipt <fresh-project-launcher-receipt.json>",
         "mappings": "Normalize legacy node and endpoint identifiers to the declared Jouvence namespaces while preserving source labels and typed endpoints.",
         "transformations": "Export legacy source tables into typed nodes, deduplicated edge assertions and evidence where recoverable.",
         "exclusions": "Do not infer missing evidence, source releases or endpoint projections from a legacy relation name.",
