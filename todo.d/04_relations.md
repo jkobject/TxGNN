@@ -7,6 +7,8 @@
 - Terminal backlog: `docs/relation_backlog_prioritized.md`.
 - Five legacy molecule lineage gaps: `docs/relation-provenance-and-gaps.md`.
 - Generator/checker: `scripts/build_relation_evidence_ledger.py`.
+- Reopened source/recovery freeze: `docs/relation-expansion-source-contract.md`
+  and `.json`; checker: `scripts/build_relation_expansion_source_contract.py`.
 
 Current flat-layout catalogue denominator:
 
@@ -24,8 +26,9 @@ not current dispatch truth.
 
 The 21 canonical edge tables without evidence are fully classified:
 
-- accepted no-evidence structural/ontological: `7`;
-- evidence backfill, source known: `5`;
+- accepted no-evidence structural/ontological: `8` (including the accepted
+  table-provenance-only `organism_has_gene` structural/reference exception);
+- evidence backfill, source known: `4`;
 - provenance recovery required: `4`;
 - metadata-only, graph-disconnected: `2`;
 - relation-policy decision required: `3`.
@@ -60,6 +63,23 @@ The 24 noncanonical active relations are classified once in the ledger:
 
 Historical staged row counts are not current object identities. Future work must
 create a newly identified task-scoped candidate before review or promotion.
+
+## Reopened expansion source freeze
+
+The source/recovery contract now covers all 24 noncanonical active relations,
+the five molecule provenance gaps, the three retained expression relations, and
+`organism_has_gene`. It preserves ReMap's 1,224,536/6,356,561 bounded staged pilot
+without calling the CRM compact sidecar final topology; the deleted PRISM #15
+builder/file/checksum/mapping contract; current flat `raw/` Reactome and
+Cellosaurus identities; and explicit source/refetch gaps where no lineage is
+pinned. Existing non-zero expression topology is retained; future evidence and
+features preserve numeric values and deterministic source/context-specific
+`low|medium|high` quantiles with exact groups and cutoffs. `tf_regulates_gene`
+remains inferred/context-specific only, never an observed source-native table.
+The new 31-day GCS soft-delete policy is effective only from
+2026-08-12T09:27:50.492Z and is not retroactive; bounded deleted-object probes
+found no historical PRISM staging, so its only recovery route is exact Figshare
+refetch/checksum verification plus the historical builder.
 
 ## Definition of terminal relation work
 

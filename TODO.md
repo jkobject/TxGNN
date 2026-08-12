@@ -70,6 +70,8 @@ Use these, not old `.omoc` reports:
 - `docs/relation_coverage_current.md`
 - `reproduce/15_kg_schema_overview.ipynb`
 - `docs/relation_backlog_prioritized.md`
+- `docs/relation-expansion-source-contract.md` and `.json` (review-required
+  source/recovery freeze for reopened expansion; no build/write authorization)
 
 Accepted snapshot:
 
@@ -174,6 +176,12 @@ Use `docs/relation_backlog_prioritized.md` and `todo.d/04_relations.md`. A relat
 
 - `t_15d71ef0` — relation provenance reconciliation: five canonical legacy molecule relations remain explicitly `provenance-gap`; PR #44 `disease_associated_protein`, PR #15 PRISM 20Q2, and the PR #41 zero-row inferred result are preserved in `docs/relation-provenance-and-gaps.md`. This is documentation/backlog status only and authorizes no rebuild or canonical write.
 - `t_ac616200` — fresh flat-layout ledger: `67` active relations, `43` canonical edges, `22` evidence tables, `21` edge-without-evidence routes, and `24` noncanonical active relations. Use `docs/relation-evidence-ledger.json`; historical staged row counts are not current immutable inventory.
+- `t_ebc68551` — review-required relation expansion source/recovery freeze:
+  deterministic 33-row contract (24 noncanonical + five molecule gaps + three
+  retained expression relations + `organism_has_gene`). It preserves deleted
+  PRISM and bounded ReMap history honestly, pins retrievable flat `raw/` objects,
+  requires expression numeric values/context quantiles, and authorizes no heavy
+  fetch, GCS write, build, or promotion before review/merge.
 
 ### 7. Process hygiene
 

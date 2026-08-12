@@ -60,6 +60,15 @@ def test_five_provenance_gaps_cannot_disappear_or_be_false_promoted() -> None:
     assert rows["molecule_treats_disease"]["no_evidence_route"] is None
 
 
+def test_organism_has_gene_is_structural_without_fabricated_evidence() -> None:
+    rows = {row["relation"]: row for row in build_ledger()["relations"]}
+    row = rows["organism_has_gene"]
+    assert row["canonical_evidence"] is None
+    assert row["no_evidence_route"] == "accepted-no-evidence-structural/ontological"
+    assert "table-level source/release provenance" in row["next_bounded_action"]
+    assert "never fabricate row evidence" in row["next_bounded_action"]
+
+
 def test_evidence_without_edge_fails_closed(tmp_path: Path) -> None:
     catalog = json.loads(DEFAULT_CATALOG.read_text())
     orphan = next(

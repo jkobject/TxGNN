@@ -28,6 +28,10 @@ This directory is the single home for durable project knowledge. Start at the re
 - [`relation_coverage_current.md`](relation_coverage_current.md) — generated human view of the relation/evidence ledger.
 - [`relation_backlog_prioritized.md`](relation_backlog_prioritized.md) — terminal no-evidence and noncanonical routing backlog.
 - [`relation-provenance-and-gaps.md`](relation-provenance-and-gaps.md) — durable provenance contract for five legacy molecule relation gaps plus reconciled PR #44, PR #15, and PR #41 relation work.
+- [`relation-expansion-source-contract.md`](relation-expansion-source-contract.md)
+  and [`relation-expansion-source-contract.json`](relation-expansion-source-contract.json)
+  — deterministic source, recovery, raw-availability, builder, mapping/quarantine,
+  and execution contract for the reopened expansion lanes.
 - [`evidence_and_edge_schema_plan.md`](evidence_and_edge_schema_plan.md) — assertion/evidence separation.
 - [`source_native_expansion_policy.md`](source_native_expansion_policy.md) — source and endpoint policy.
 - [`source_measure_edge_matrix.md`](source_measure_edge_matrix.md) — source/measurement/relation decisions.

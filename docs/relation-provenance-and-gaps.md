@@ -62,6 +62,13 @@ The corrected historical semantics are 31,349 deduplicated canonical cell-line/m
 
 A future reprise is bounded to a fresh task-scoped fetch of these five exact files, checksum verification, resurrection/review of the historical builder in an isolated branch, a small fixture replay, and a newly versioned staged candidate with endpoint, pooling-context, evidence-multiplicity, and deterministic-readback gates. It does not authorize recovery of deleted staging, canonical writes, or coupling to CRISPR dependency.
 
+Live recovery boundary (2026-08-12): bucket soft delete is 31 days
+(`2678400s`) but became effective only at `2026-08-12T09:27:50.492Z`;
+object versioning and lifecycle are absent. Bounded `--soft-deleted` probes under
+both `gs://jouvencekb/kg/staging/**` and `gs://jouvencekb/staging/**` matched no
+objects. Soft delete is not retroactive, so PRISM #15 staging is not GCS-restorable:
+recovery is the exact Figshare refetch/checksum path plus the historical builder.
+
 ### Formal inferred-edge lane — PR #41 result retained
 
 The accepted formal v2 registry had 24 templates and materialized 701 joined paths. Among them, 377 had known pharmacological action and 596 had known disease direction, but 0 had known disease mechanism. Consequently it emitted 0 inferred edge rows and 0 inferred evidence rows, and no placeholder Parquet was created. This is a valid fail-closed result, not a missing-artifact failure and not permission to relax the operand contract.
@@ -79,3 +86,9 @@ A relation listed in the first table may leave `provenance-gap` only when all of
 7. independent review.
 
 A migration copy, catalog footer, notebook that only checks artifact identity, source-family URL, or later partial evidence backfill is insufficient on its own.
+
+The subsequent relation-expansion source freeze is
+[`relation-expansion-source-contract.md`](relation-expansion-source-contract.md)
+with a deterministic JSON partner. It does not close any of these five gaps; it
+turns recovered sources/builders and explicit missing artifacts into independently
+executable downstream contracts.

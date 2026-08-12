@@ -1,0 +1,1405 @@
+{
+  "canonical_root": "gs://jouvencekb/main",
+  "contract_statuses": [
+    "accepted-no-row-evidence",
+    "current-raw-available",
+    "historical-artifact-deleted",
+    "historical-builder-recoverable",
+    "remote-refetch-required",
+    "source-selection-required"
+  ],
+  "generated_from": [
+    "manage_db/kg_schema.py",
+    "docs/relation-evidence-ledger.json",
+    "docs/storage-migration-20260727/object-map.json",
+    "Git history and relation-specific reports named in each row"
+  ],
+  "policies": {
+    "expression": "retain non-zero topology; preserve numeric values; deterministic source/context-specific low|medium|high quantiles with exact group and cutoffs",
+    "gcs_recovery": "Bucket soft delete is 31 days (2678400s) effective only from 2026-08-12T09:27:50.492Z; object versioning and lifecycle are absent. Bounded soft-deleted probes under kg/staging/** and staging/** matched no objects. This is not retroactive recovery: PRISM #15 must be refetched from exact Figshare identities and replayed with the historical builder.",
+    "no_canonical_writes": true,
+    "organism_has_gene": "accepted no-row-evidence structural/reference exception; table-level source/release provenance only",
+    "provenance_gap_exit_gate": [
+      "release-pinned native source and checksum",
+      "exact mapping/quarantine",
+      "immutable builder",
+      "verified replay command",
+      "canonical-generation parity/exception report",
+      "independent review"
+    ],
+    "tf_regulates_gene": "inferred/context-specific only from reviewed tf_binds_enhancer plus compatible-context enhancer_regulates_gene; observed tables remain separate"
+  },
+  "raw_root": "gs://jouvencekb/raw",
+  "relations": [
+    {
+      "assertion_policy": "source-native Cellosaurus cell-type derivation annotation",
+      "availability_statuses": [
+        "current-raw-available",
+        "historical-builder-recoverable"
+      ],
+      "builder_status": "historical/current builder lineage recoverable; update paths and manifest checks",
+      "direct": true,
+      "evidence_fields": [
+        "source",
+        "source_dataset",
+        "source_release",
+        "source_record_id",
+        "original_endpoint_ids",
+        "mapping_method",
+        "mapping_confidence",
+        "license"
+      ],
+      "execution_placement": "bounded fixture/source audit on Mac; full or bulk build on txgnn-worker; task-scoped staging only",
+      "historical_identity": "historical validated candidate: 65 / 65",
+      "kind": "experimental",
+      "license_access": "Verify ontology/source redistribution terms before promotion.",
+      "mapping_rejection_policy": "Map source-native typed endpoints exactly; preserve predicate; reject missing, obsolete, ambiguous and wrong-type endpoints.",
+      "missing_artifacts": [],
+      "next_rebuild_card": "create a relation-specific producer card after this contract is reviewed and merged",
+      "preferred_sources": [
+        "Cellosaurus cell-type annotations"
+      ],
+      "raw_objects": [
+        {
+          "crc32c_base64": "coX5Eg==",
+          "generation": "1785155500649684",
+          "size": 116572609,
+          "uri": "gs://jouvencekb/raw/cellosaurus_20260623.obo"
+        }
+      ],
+      "relation": "cell_line_derived_from_cell_type",
+      "release_version": "2026-06-23 historical source snapshot",
+      "x_type": "cell_line",
+      "y_type": "cell_type"
+    },
+    {
+      "assertion_policy": "retain every existing edge whose native expression is non-zero; preserve numeric expression and add deterministic low|medium|high bins",
+      "availability_statuses": [
+        "source-selection-required"
+      ],
+      "builder_status": "feature/evidence enrichment builder required; canonical edge deletion is out of scope",
+      "direct": true,
+      "evidence_fields": [
+        "source",
+        "source_dataset",
+        "source_release",
+        "source_record_id",
+        "original_endpoint_ids",
+        "mapping_method",
+        "mapping_confidence",
+        "license",
+        "numeric_expression",
+        "unit",
+        "modality",
+        "context_group",
+        "quantile_grouping_columns",
+        "q_low_cutoff",
+        "q_high_cutoff",
+        "expression_bin"
+      ],
+      "execution_placement": "bounded fixture/source audit on Mac; full or bulk build on txgnn-worker; task-scoped staging only",
+      "historical_identity": "Current flat edge generation is frozen in relation-evidence-ledger.json; numeric expression is not present in edge-only topology.",
+      "kind": "experimental",
+      "license_access": "Inherit and record the native expression source license.",
+      "mapping_rejection_policy": "Quantiles must be computed within an explicitly recorded source/context/modality group; record exact grouping and q cutoffs; never pool incomparable modalities; quarantine rows lacking a comparable group or typed endpoint.",
+      "missing_artifacts": [],
+      "next_rebuild_card": "create a relation-specific producer card after this contract is reviewed and merged",
+      "preferred_sources": [
+        "the release-pinned native expression source that produced the retained canonical table"
+      ],
+      "raw_objects": [],
+      "relation": "cell_line_expresses_gene",
+      "release_version": "Table exists canonically; exact accepted source/release and numeric payload must be recovered before enrichment.",
+      "x_type": "cell_line",
+      "y_type": "gene"
+    },
+    {
+      "assertion_policy": "direct mass-spectrometry protein abundance only; no RNA projection; future threshold must retain numeric abundance",
+      "availability_statuses": [
+        "historical-builder-recoverable",
+        "remote-refetch-required"
+      ],
+      "builder_status": "manage_db/build_staged_cell_line_assays.py recoverable/current; pin source payload",
+      "direct": true,
+      "evidence_fields": [
+        "source",
+        "source_dataset",
+        "source_release",
+        "source_record_id",
+        "original_endpoint_ids",
+        "mapping_method",
+        "mapping_confidence",
+        "license",
+        "assay",
+        "protein_abundance",
+        "threshold_rule",
+        "source_protein_column"
+      ],
+      "execution_placement": "bounded fixture/source audit on Mac; full or bulk build on txgnn-worker; task-scoped staging only",
+      "historical_identity": "t_103021f3: 3,083 edges / 3,090 direct-MS evidence; seven edges have two evidence rows.",
+      "kind": "experimental",
+      "license_access": "DepMap access/redistribution terms apply.",
+      "mapping_rejection_policy": "Exact ACH mapping and source protein-to-current protein mapping; reject non-MS, missing and ambiguous endpoints.",
+      "missing_artifacts": [],
+      "next_rebuild_card": "create a relation-specific producer card after this contract is reviewed and merged",
+      "preferred_sources": [
+        "DepMap/Harmonized MS CCLE Gygi"
+      ],
+      "raw_objects": [],
+      "relation": "cell_line_expresses_protein",
+      "release_version": "Historical t_103021f3 candidate release; exact DepMap file identity/checksum must be recreated.",
+      "x_type": "cell_line",
+      "y_type": "protein"
+    },
+    {
+      "assertion_policy": "source-native Cellosaurus cell-line disease annotation",
+      "availability_statuses": [
+        "current-raw-available",
+        "historical-builder-recoverable"
+      ],
+      "builder_status": "historical/current builder lineage recoverable; update paths and manifest checks",
+      "direct": false,
+      "evidence_fields": [
+        "source",
+        "source_dataset",
+        "source_release",
+        "source_record_id",
+        "original_endpoint_ids",
+        "mapping_method",
+        "mapping_confidence",
+        "license"
+      ],
+      "execution_placement": "bounded fixture/source audit on Mac; full or bulk build on txgnn-worker; task-scoped staging only",
+      "historical_identity": "historical validated candidate: 983 edges / 1,218 evidence",
+      "kind": "experimental",
+      "license_access": "Verify ontology/source redistribution terms before promotion.",
+      "mapping_rejection_policy": "Map source-native typed endpoints exactly; preserve predicate; reject missing, obsolete, ambiguous and wrong-type endpoints.",
+      "missing_artifacts": [],
+      "next_rebuild_card": "create a relation-specific producer card after this contract is reviewed and merged",
+      "preferred_sources": [
+        "Cellosaurus disease annotations"
+      ],
+      "raw_objects": [
+        {
+          "crc32c_base64": "STFRNQ==",
+          "generation": "1785155500485969",
+          "size": 119996997,
+          "uri": "gs://jouvencekb/raw/cellosaurus_20260623.txt"
+        }
+      ],
+      "relation": "cell_line_models_disease",
+      "release_version": "2026-06-23 historical source snapshot",
+      "x_type": "cell_line",
+      "y_type": "disease"
+    },
+    {
+      "assertion_policy": "independent direct pharmacological viability screen; preferred screen, passed STR, AUC <= 0.70 and R2 >= 0.80; do not couple to CRISPR dependency",
+      "availability_statuses": [
+        "historical-builder-recoverable",
+        "historical-artifact-deleted",
+        "remote-refetch-required"
+      ],
+      "builder_status": "PRISM historical builder recoverable from Git but intentionally not restored as active code in this contract card",
+      "direct": true,
+      "evidence_fields": [
+        "source",
+        "source_dataset",
+        "source_release",
+        "source_record_id",
+        "original_endpoint_ids",
+        "mapping_method",
+        "mapping_confidence",
+        "license",
+        "assay",
+        "screen_id",
+        "pooling_context",
+        "auc",
+        "r2",
+        "ec50",
+        "ic50",
+        "threshold_rule",
+        "source_curve_id"
+      ],
+      "execution_placement": "bounded fixture/source audit on Mac; full or bulk build on txgnn-worker; task-scoped staging only",
+      "historical_identity": "PR #15 builder manage_db/build_staged_prism_20q2.py at 3d65b66e15df03abb8c08e08de6e127134d31bcc (blob SHA-256 dd7aea221d7befd18f21292e9d4371a3451e692a7cdac5ec7fc6ccd007bccc05); 31,349 edges / 31,952 qualifying curves. GDSC t_103021f3: 11,040 / 11,713.",
+      "kind": "experimental",
+      "license_access": "PRISM CC BY 4.0; verify GDSC terms independently if that lane is rebuilt.",
+      "mapping_rejection_policy": "Cell lines exact ACH identity; compounds exact unique RDKit InChIKey, names prohibited. Historical PRISM: 1,054/1,552 Broad IDs mapped; quarantine 447 unmatched structures, 39 conflicting structures, 12 missing structures.",
+      "missing_artifacts": [
+        "all five downloaded PRISM files",
+        "fresh checksum manifest",
+        "current flat-layout node snapshots/crosswalk",
+        "mapping quarantine",
+        "edge/evidence/features candidates",
+        "validation and deterministic readback receipts",
+        "historical GCS staging is not restorable: bounded soft-deleted probes matched no objects; refetch exact Figshare files instead"
+      ],
+      "next_rebuild_card": "create a relation-specific producer card after this contract is reviewed and merged",
+      "preferred_sources": [
+        "PRISM Repurposing 20Q2 Secondary Figshare article 20564034",
+        "GDSC/Sanger dose-response as an independent assay lane"
+      ],
+      "raw_objects": [
+        {
+          "description": "dose-response curve parameters",
+          "figshare_file_id": "36794595",
+          "md5": "eb0c7ee3ccb9e480148c71fcdc97312e"
+        },
+        {
+          "description": "pooling metadata",
+          "figshare_file_id": "36794610",
+          "md5": "8a484f5f4b704abd06cd3201e1d7692b"
+        },
+        {
+          "description": "README",
+          "figshare_file_id": "36794613",
+          "md5": "47419770d1edfcc36e0b11465f7d1fd0"
+        },
+        {
+          "description": "replicate-collapsed logfold change",
+          "figshare_file_id": "36794616",
+          "md5": "d89c92f6d66366729c54389a4f3876b4"
+        },
+        {
+          "description": "replicate-collapsed treatment info",
+          "figshare_file_id": "36794619",
+          "md5": "162da467eb97a67abdbdbee7af101091"
+        }
+      ],
+      "relation": "cell_line_responds_to_molecule",
+      "release_version": "PRISM DOI 10.6084/m9.figshare.20564034.v1; five exact file identities pinned below.",
+      "x_type": "cell_line",
+      "y_type": "molecule"
+    },
+    {
+      "assertion_policy": "retain every existing edge whose native expression is non-zero; preserve numeric expression and add deterministic low|medium|high bins",
+      "availability_statuses": [
+        "source-selection-required"
+      ],
+      "builder_status": "feature/evidence enrichment builder required; canonical edge deletion is out of scope",
+      "direct": true,
+      "evidence_fields": [
+        "source",
+        "source_dataset",
+        "source_release",
+        "source_record_id",
+        "original_endpoint_ids",
+        "mapping_method",
+        "mapping_confidence",
+        "license",
+        "numeric_expression",
+        "unit",
+        "modality",
+        "context_group",
+        "quantile_grouping_columns",
+        "q_low_cutoff",
+        "q_high_cutoff",
+        "expression_bin"
+      ],
+      "execution_placement": "bounded fixture/source audit on Mac; full or bulk build on txgnn-worker; task-scoped staging only",
+      "historical_identity": "Current flat edge generation is frozen in relation-evidence-ledger.json; numeric expression is not present in edge-only topology.",
+      "kind": "expression",
+      "license_access": "Inherit and record the native expression source license.",
+      "mapping_rejection_policy": "Quantiles must be computed within an explicitly recorded source/context/modality group; record exact grouping and q cutoffs; never pool incomparable modalities; quarantine rows lacking a comparable group or typed endpoint.",
+      "missing_artifacts": [],
+      "next_rebuild_card": "create a relation-specific producer card after this contract is reviewed and merged",
+      "preferred_sources": [
+        "the release-pinned native expression source that produced the retained canonical table"
+      ],
+      "raw_objects": [],
+      "relation": "cell_type_expresses_gene",
+      "release_version": "Table exists canonically; exact accepted source/release and numeric payload must be recovered before enrichment.",
+      "x_type": "cell_type",
+      "y_type": "gene"
+    },
+    {
+      "assertion_policy": "retain direct protein measurement modality/context; no RNA-to-protein relabeling",
+      "availability_statuses": [
+        "source-selection-required",
+        "remote-refetch-required"
+      ],
+      "builder_status": "source-specific builder required",
+      "direct": true,
+      "evidence_fields": [
+        "source",
+        "source_dataset",
+        "source_release",
+        "source_record_id",
+        "original_endpoint_ids",
+        "mapping_method",
+        "mapping_confidence",
+        "license",
+        "context",
+        "assay_or_method",
+        "score",
+        "effect_size",
+        "p_value",
+        "q_value",
+        "sample_count",
+        "threshold_policy"
+      ],
+      "execution_placement": "bounded fixture/source audit on Mac; full or bulk build on txgnn-worker; task-scoped staging only",
+      "historical_identity": "No accepted immutable historical producer/artifact identity recovered.",
+      "kind": "expression",
+      "license_access": "Source-specific license/access review required.",
+      "mapping_rejection_policy": "Require exact typed endpoint mapping and preserve all context/statistics; quarantine ambiguous/unmapped rows; never derive from adjacent KG paths.",
+      "missing_artifacts": [],
+      "next_rebuild_card": "create a relation-specific producer card after this contract is reviewed and merged",
+      "preferred_sources": [
+        "direct cell-type-resolved proteomics or validated protein-product measurement"
+      ],
+      "raw_objects": [],
+      "relation": "cell_type_expresses_protein",
+      "release_version": "No release-pinned accepted source selected.",
+      "x_type": "cell_type",
+      "y_type": "protein"
+    },
+    {
+      "assertion_policy": "explicit CL part_of/located_in tissue assertion",
+      "availability_statuses": [
+        "current-raw-available",
+        "historical-builder-recoverable"
+      ],
+      "builder_status": "historical/current builder lineage recoverable; update paths and manifest checks",
+      "direct": true,
+      "evidence_fields": [
+        "source",
+        "source_dataset",
+        "source_release",
+        "source_record_id",
+        "original_endpoint_ids",
+        "mapping_method",
+        "mapping_confidence",
+        "license"
+      ],
+      "execution_placement": "bounded fixture/source audit on Mac; full or bulk build on txgnn-worker; task-scoped staging only",
+      "historical_identity": "t_badd3e1e: 958 edges / 958 evidence",
+      "kind": "ontological",
+      "license_access": "Verify ontology/source redistribution terms before promotion.",
+      "mapping_rejection_policy": "Map source-native typed endpoints exactly; preserve predicate; reject missing, obsolete, ambiguous and wrong-type endpoints.",
+      "missing_artifacts": [],
+      "next_rebuild_card": "create a relation-specific producer card after this contract is reviewed and merged",
+      "preferred_sources": [
+        "Cell Ontology CL relationship axioms plus UBERON"
+      ],
+      "raw_objects": [],
+      "relation": "cell_type_found_in_tissue",
+      "release_version": "2026-06-23 historical source snapshot",
+      "x_type": "cell_type",
+      "y_type": "tissue"
+    },
+    {
+      "assertion_policy": "explicit disease-cell enrichment/annotation with cohort statistics; never infer from tissue or expression",
+      "availability_statuses": [
+        "source-selection-required",
+        "remote-refetch-required"
+      ],
+      "builder_status": "source-specific builder required",
+      "direct": false,
+      "evidence_fields": [
+        "source",
+        "source_dataset",
+        "source_release",
+        "source_record_id",
+        "original_endpoint_ids",
+        "mapping_method",
+        "mapping_confidence",
+        "license",
+        "context",
+        "assay_or_method",
+        "score",
+        "effect_size",
+        "p_value",
+        "q_value",
+        "sample_count",
+        "threshold_policy"
+      ],
+      "execution_placement": "bounded fixture/source audit on Mac; full or bulk build on txgnn-worker; task-scoped staging only",
+      "historical_identity": "No accepted immutable historical producer/artifact identity recovered.",
+      "kind": "disease_assoc",
+      "license_access": "Source-specific license/access review required.",
+      "mapping_rejection_policy": "Require exact typed endpoint mapping and preserve all context/statistics; quarantine ambiguous/unmapped rows; never derive from adjacent KG paths.",
+      "missing_artifacts": [],
+      "next_rebuild_card": "create a relation-specific producer card after this contract is reviewed and merged",
+      "preferred_sources": [
+        "reviewed disease single-cell atlas/enrichment source"
+      ],
+      "raw_objects": [],
+      "relation": "cell_type_involved_in_disease",
+      "release_version": "No release-pinned accepted source selected.",
+      "x_type": "cell_type",
+      "y_type": "disease"
+    },
+    {
+      "assertion_policy": "direct cell-type/drug response with assay, dose, time and direction; no cell-line proxy",
+      "availability_statuses": [
+        "source-selection-required",
+        "remote-refetch-required"
+      ],
+      "builder_status": "source-specific builder required",
+      "direct": false,
+      "evidence_fields": [
+        "source",
+        "source_dataset",
+        "source_release",
+        "source_record_id",
+        "original_endpoint_ids",
+        "mapping_method",
+        "mapping_confidence",
+        "license",
+        "context",
+        "assay_or_method",
+        "score",
+        "effect_size",
+        "p_value",
+        "q_value",
+        "sample_count",
+        "threshold_policy"
+      ],
+      "execution_placement": "bounded fixture/source audit on Mac; full or bulk build on txgnn-worker; task-scoped staging only",
+      "historical_identity": "No accepted immutable historical producer/artifact identity recovered.",
+      "kind": "pharmacological",
+      "license_access": "Source-specific license/access review required.",
+      "mapping_rejection_policy": "Require exact typed endpoint mapping and preserve all context/statistics; quarantine ambiguous/unmapped rows; never derive from adjacent KG paths.",
+      "missing_artifacts": [],
+      "next_rebuild_card": "create a relation-specific producer card after this contract is reviewed and merged",
+      "preferred_sources": [
+        "cell-type-resolved perturbational response atlas such as reviewed scPerturb/Sci-Plex lane"
+      ],
+      "raw_objects": [],
+      "relation": "cell_type_responds_to_molecule",
+      "release_version": "No release-pinned accepted source selected.",
+      "x_type": "cell_type",
+      "y_type": "molecule"
+    },
+    {
+      "assertion_policy": "explicit CL is_a hierarchy",
+      "availability_statuses": [
+        "current-raw-available",
+        "historical-builder-recoverable"
+      ],
+      "builder_status": "historical/current builder lineage recoverable; update paths and manifest checks",
+      "direct": true,
+      "evidence_fields": [
+        "source",
+        "source_dataset",
+        "source_release",
+        "source_record_id",
+        "original_endpoint_ids",
+        "mapping_method",
+        "mapping_confidence",
+        "license"
+      ],
+      "execution_placement": "bounded fixture/source audit on Mac; full or bulk build on txgnn-worker; task-scoped staging only",
+      "historical_identity": "t_badd3e1e: 4,526 / 4,526",
+      "kind": "ontological",
+      "license_access": "Verify ontology/source redistribution terms before promotion.",
+      "mapping_rejection_policy": "Map source-native typed endpoints exactly; preserve predicate; reject missing, obsolete, ambiguous and wrong-type endpoints.",
+      "missing_artifacts": [],
+      "next_rebuild_card": "create a relation-specific producer card after this contract is reviewed and merged",
+      "preferred_sources": [
+        "Cell Ontology CL is_a hierarchy"
+      ],
+      "raw_objects": [],
+      "relation": "cell_type_subtype_of_cell_type",
+      "release_version": "2026-06-23 historical source snapshot",
+      "x_type": "cell_type",
+      "y_type": "cell_type"
+    },
+    {
+      "assertion_policy": "metadata/provenance only; keep disconnected from default biomedical training adjacency",
+      "availability_statuses": [
+        "source-selection-required"
+      ],
+      "builder_status": "source-specific builder required",
+      "direct": true,
+      "evidence_fields": [
+        "source",
+        "source_dataset",
+        "source_release",
+        "source_record_id",
+        "original_endpoint_ids",
+        "mapping_method",
+        "mapping_confidence",
+        "license"
+      ],
+      "execution_placement": "bounded metadata build locally or on worker by size; graph-disconnected output only",
+      "historical_identity": "No accepted immutable historical producer/artifact identity recovered.",
+      "kind": "metadata",
+      "license_access": "Source-specific metadata license required.",
+      "mapping_rejection_policy": "Require stable catalog identifiers and exact typed members; reject unresolved aliases and never infer membership from graph proximity.",
+      "missing_artifacts": [],
+      "next_rebuild_card": "create a relation-specific producer card after this contract is reviewed and merged",
+      "preferred_sources": [
+        "release-pinned provenance/catalog registry selected by a future metadata card"
+      ],
+      "raw_objects": [],
+      "relation": "dataset_contains_cell_type",
+      "release_version": "No accepted source release selected.",
+      "x_type": "dataset",
+      "y_type": "cell_type"
+    },
+    {
+      "assertion_policy": "metadata/provenance only; keep disconnected from default biomedical training adjacency",
+      "availability_statuses": [
+        "source-selection-required"
+      ],
+      "builder_status": "source-specific builder required",
+      "direct": true,
+      "evidence_fields": [
+        "source",
+        "source_dataset",
+        "source_release",
+        "source_record_id",
+        "original_endpoint_ids",
+        "mapping_method",
+        "mapping_confidence",
+        "license"
+      ],
+      "execution_placement": "bounded metadata build locally or on worker by size; graph-disconnected output only",
+      "historical_identity": "No accepted immutable historical producer/artifact identity recovered.",
+      "kind": "metadata",
+      "license_access": "Source-specific metadata license required.",
+      "mapping_rejection_policy": "Require stable catalog identifiers and exact typed members; reject unresolved aliases and never infer membership from graph proximity.",
+      "missing_artifacts": [],
+      "next_rebuild_card": "create a relation-specific producer card after this contract is reviewed and merged",
+      "preferred_sources": [
+        "release-pinned provenance/catalog registry selected by a future metadata card"
+      ],
+      "raw_objects": [],
+      "relation": "dataset_contains_disease",
+      "release_version": "No accepted source release selected.",
+      "x_type": "dataset",
+      "y_type": "disease"
+    },
+    {
+      "assertion_policy": "metadata/provenance only; keep disconnected from default biomedical training adjacency",
+      "availability_statuses": [
+        "source-selection-required"
+      ],
+      "builder_status": "source-specific builder required",
+      "direct": true,
+      "evidence_fields": [
+        "source",
+        "source_dataset",
+        "source_release",
+        "source_record_id",
+        "original_endpoint_ids",
+        "mapping_method",
+        "mapping_confidence",
+        "license"
+      ],
+      "execution_placement": "bounded metadata build locally or on worker by size; graph-disconnected output only",
+      "historical_identity": "No accepted immutable historical producer/artifact identity recovered.",
+      "kind": "metadata",
+      "license_access": "Source-specific metadata license required.",
+      "mapping_rejection_policy": "Require stable catalog identifiers and exact typed members; reject unresolved aliases and never infer membership from graph proximity.",
+      "missing_artifacts": [],
+      "next_rebuild_card": "create a relation-specific producer card after this contract is reviewed and merged",
+      "preferred_sources": [
+        "release-pinned provenance/catalog registry selected by a future metadata card"
+      ],
+      "raw_objects": [],
+      "relation": "dataset_contains_molecule",
+      "release_version": "No accepted source release selected.",
+      "x_type": "dataset",
+      "y_type": "molecule"
+    },
+    {
+      "assertion_policy": "source-observed disease co-occurrence/statistic; never synthesize from shared genes, phenotypes or treatments",
+      "availability_statuses": [
+        "source-selection-required",
+        "remote-refetch-required"
+      ],
+      "builder_status": "source-specific builder required",
+      "direct": false,
+      "evidence_fields": [
+        "source",
+        "source_dataset",
+        "source_release",
+        "source_record_id",
+        "original_endpoint_ids",
+        "mapping_method",
+        "mapping_confidence",
+        "license",
+        "context",
+        "assay_or_method",
+        "score",
+        "effect_size",
+        "p_value",
+        "q_value",
+        "sample_count",
+        "threshold_policy"
+      ],
+      "execution_placement": "bounded fixture/source audit on Mac; full or bulk build on txgnn-worker; task-scoped staging only",
+      "historical_identity": "No accepted immutable historical producer/artifact identity recovered.",
+      "kind": "epidemiological",
+      "license_access": "Source-specific license/access review required.",
+      "mapping_rejection_policy": "Require exact typed endpoint mapping and preserve all context/statistics; quarantine ambiguous/unmapped rows; never derive from adjacent KG paths.",
+      "missing_artifacts": [],
+      "next_rebuild_card": "create a relation-specific producer card after this contract is reviewed and merged",
+      "preferred_sources": [
+        "public/licensable cohort, claims or curated comorbidity source"
+      ],
+      "raw_objects": [],
+      "relation": "disease_comorbid_disease",
+      "release_version": "No release-pinned accepted source selected.",
+      "x_type": "disease",
+      "y_type": "disease"
+    },
+    {
+      "assertion_policy": "direct enhancer-to-transcript assertion only; no gene-to-all-transcripts expansion",
+      "availability_statuses": [
+        "source-selection-required",
+        "remote-refetch-required"
+      ],
+      "builder_status": "source-specific builder required",
+      "direct": true,
+      "evidence_fields": [
+        "source",
+        "source_dataset",
+        "source_release",
+        "source_record_id",
+        "original_endpoint_ids",
+        "mapping_method",
+        "mapping_confidence",
+        "license",
+        "context",
+        "assay_or_method",
+        "score",
+        "effect_size",
+        "p_value",
+        "q_value",
+        "sample_count",
+        "threshold_policy"
+      ],
+      "execution_placement": "bounded fixture/source audit on Mac; full or bulk build on txgnn-worker; task-scoped staging only",
+      "historical_identity": "No accepted immutable historical producer/artifact identity recovered.",
+      "kind": "regulatory",
+      "license_access": "Source-specific license/access review required.",
+      "mapping_rejection_policy": "Require exact typed endpoint mapping and preserve all context/statistics; quarantine ambiguous/unmapped rows; never derive from adjacent KG paths.",
+      "missing_artifacts": [],
+      "next_rebuild_card": "create a relation-specific producer card after this contract is reviewed and merged",
+      "preferred_sources": [
+        "transcript/TSS-native enhancer activity source; none accepted yet"
+      ],
+      "raw_objects": [],
+      "relation": "enhancer_regulates_transcript",
+      "release_version": "No release-pinned accepted source selected.",
+      "x_type": "enhancer",
+      "y_type": "transcript"
+    },
+    {
+      "assertion_policy": "symmetric correlative feature/context with sparse threshold/top-k and leakage policy; not causal regulation",
+      "availability_statuses": [
+        "source-selection-required",
+        "remote-refetch-required"
+      ],
+      "builder_status": "source-specific builder required",
+      "direct": false,
+      "evidence_fields": [
+        "source",
+        "source_dataset",
+        "source_release",
+        "source_record_id",
+        "original_endpoint_ids",
+        "mapping_method",
+        "mapping_confidence",
+        "license",
+        "context",
+        "assay_or_method",
+        "score",
+        "effect_size",
+        "p_value",
+        "q_value",
+        "sample_count",
+        "threshold_policy"
+      ],
+      "execution_placement": "bounded fixture/source audit on Mac; full or bulk build on txgnn-worker; task-scoped staging only",
+      "historical_identity": "No accepted immutable historical producer/artifact identity recovered.",
+      "kind": "expression",
+      "license_access": "Source-specific license/access review required.",
+      "mapping_rejection_policy": "Require exact typed endpoint mapping and preserve all context/statistics; quarantine ambiguous/unmapped rows; never derive from adjacent KG paths.",
+      "missing_artifacts": [],
+      "next_rebuild_card": "create a relation-specific producer card after this contract is reviewed and merged",
+      "preferred_sources": [
+        "GTEx tissue-specific correlation or other reviewed public context-specific coexpression source"
+      ],
+      "raw_objects": [],
+      "relation": "gene_coexpressed_gene",
+      "release_version": "No release-pinned accepted source selected.",
+      "x_type": "gene",
+      "y_type": "gene"
+    },
+    {
+      "assertion_policy": "source-native broad molecule-to-phenotype association; non-causal",
+      "availability_statuses": [
+        "remote-refetch-required",
+        "source-selection-required"
+      ],
+      "builder_status": "original accepted builder/commit not recovered",
+      "direct": false,
+      "evidence_fields": [
+        "source",
+        "source_dataset",
+        "source_release",
+        "source_record_id",
+        "original_endpoint_ids",
+        "mapping_method",
+        "mapping_confidence",
+        "license",
+        "source_predicate",
+        "score",
+        "threshold",
+        "assay",
+        "biological_context",
+        "pair_orientation"
+      ],
+      "execution_placement": "bounded fixture/source audit on Mac; full or bulk build on txgnn-worker; task-scoped staging only",
+      "historical_identity": "Current flat canonical object identity is frozen in relation-evidence-ledger.json; migration proves byte movement, not source replay.",
+      "kind": "pharmacological",
+      "license_access": "Verify the selected Dataverse constituent license and redistribution terms before fetch/build.",
+      "mapping_rejection_policy": "Recover exact molecule/partner crosswalk, filters, rejected/unmapped/ambiguous rows, deduplication and orientation; compare candidate-only/canonical-only/intersection against the frozen canonical generation.",
+      "missing_artifacts": [
+        "release-pinned native constituent and checksum",
+        "accepted crosswalk/quarantine manifest",
+        "original immutable producer",
+        "verified replay and parity/exception report"
+      ],
+      "next_rebuild_card": "t_86299745 \u2014 rebuild all five molecule provenance-gap lineages after parent merge",
+      "preferred_sources": [
+        "TxData/TxGNN Dataverse DOI 10.7910/DVN/CNQV69 constituent side-effect/rescue source"
+      ],
+      "raw_objects": [],
+      "relation": "molecule_associated_phenotype",
+      "release_version": "Exact accepted constituent file/release not yet pinned; Dataverse bundle DOI is known.",
+      "x_type": "molecule",
+      "y_type": "phenotype"
+    },
+    {
+      "assertion_policy": "negative/contraindication assertion only; never reuse positive indication evidence",
+      "availability_statuses": [
+        "remote-refetch-required",
+        "source-selection-required"
+      ],
+      "builder_status": "original accepted builder/commit not recovered",
+      "direct": false,
+      "evidence_fields": [
+        "source",
+        "source_dataset",
+        "source_release",
+        "source_record_id",
+        "original_endpoint_ids",
+        "mapping_method",
+        "mapping_confidence",
+        "license",
+        "source_predicate",
+        "score",
+        "threshold",
+        "assay",
+        "biological_context",
+        "pair_orientation"
+      ],
+      "execution_placement": "bounded fixture/source audit on Mac; full or bulk build on txgnn-worker; task-scoped staging only",
+      "historical_identity": "Current flat canonical object identity is frozen in relation-evidence-ledger.json; migration proves byte movement, not source replay.",
+      "kind": "pharmacological",
+      "license_access": "Verify the selected Dataverse constituent license and redistribution terms before fetch/build.",
+      "mapping_rejection_policy": "Recover exact molecule/partner crosswalk, filters, rejected/unmapped/ambiguous rows, deduplication and orientation; compare candidate-only/canonical-only/intersection against the frozen canonical generation.",
+      "missing_artifacts": [
+        "release-pinned native constituent and checksum",
+        "accepted crosswalk/quarantine manifest",
+        "original immutable producer",
+        "verified replay and parity/exception report"
+      ],
+      "next_rebuild_card": "t_86299745 \u2014 rebuild all five molecule provenance-gap lineages after parent merge",
+      "preferred_sources": [
+        "TxData/TxGNN Dataverse contraindication constituent; otherwise a release-pinned contraindication-specific source"
+      ],
+      "raw_objects": [],
+      "relation": "molecule_contraindicates_disease",
+      "release_version": "Exact accepted constituent file/release not yet pinned; Dataverse bundle DOI is known.",
+      "x_type": "molecule",
+      "y_type": "disease"
+    },
+    {
+      "assertion_policy": "directed parent-to-child chemical hierarchy with explicit salt/mixture policy",
+      "availability_statuses": [
+        "remote-refetch-required",
+        "source-selection-required"
+      ],
+      "builder_status": "original accepted builder/commit not recovered",
+      "direct": true,
+      "evidence_fields": [
+        "source",
+        "source_dataset",
+        "source_release",
+        "source_record_id",
+        "original_endpoint_ids",
+        "mapping_method",
+        "mapping_confidence",
+        "license",
+        "source_predicate",
+        "score",
+        "threshold",
+        "assay",
+        "biological_context",
+        "pair_orientation"
+      ],
+      "execution_placement": "bounded fixture/source audit on Mac; full or bulk build on txgnn-worker; task-scoped staging only",
+      "historical_identity": "Current flat canonical object identity is frozen in relation-evidence-ledger.json; migration proves byte movement, not source replay.",
+      "kind": "ontological",
+      "license_access": "Verify the selected Dataverse constituent license and redistribution terms before fetch/build.",
+      "mapping_rejection_policy": "Recover exact molecule/partner crosswalk, filters, rejected/unmapped/ambiguous rows, deduplication and orientation; compare candidate-only/canonical-only/intersection against the frozen canonical generation.",
+      "missing_artifacts": [
+        "release-pinned native constituent and checksum",
+        "accepted crosswalk/quarantine manifest",
+        "original immutable producer",
+        "verified replay and parity/exception report"
+      ],
+      "next_rebuild_card": "t_86299745 \u2014 rebuild all five molecule provenance-gap lineages after parent merge",
+      "preferred_sources": [
+        "TxData/TxGNN Dataverse chemical hierarchy constituent"
+      ],
+      "raw_objects": [],
+      "relation": "molecule_parent_of_molecule",
+      "release_version": "Exact accepted constituent file/release not yet pinned; Dataverse bundle DOI is known.",
+      "x_type": "molecule",
+      "y_type": "molecule"
+    },
+    {
+      "assertion_policy": "screen-measured synergy with explicit score threshold, context, symmetry and pair orientation",
+      "availability_statuses": [
+        "remote-refetch-required",
+        "source-selection-required"
+      ],
+      "builder_status": "original accepted builder/commit not recovered",
+      "direct": false,
+      "evidence_fields": [
+        "source",
+        "source_dataset",
+        "source_release",
+        "source_record_id",
+        "original_endpoint_ids",
+        "mapping_method",
+        "mapping_confidence",
+        "license",
+        "source_predicate",
+        "score",
+        "threshold",
+        "assay",
+        "biological_context",
+        "pair_orientation"
+      ],
+      "execution_placement": "bounded fixture/source audit on Mac; full or bulk build on txgnn-worker; task-scoped staging only",
+      "historical_identity": "Current flat canonical object identity is frozen in relation-evidence-ledger.json; migration proves byte movement, not source replay.",
+      "kind": "pharmacological",
+      "license_access": "Verify the selected Dataverse constituent license and redistribution terms before fetch/build.",
+      "mapping_rejection_policy": "Recover exact molecule/partner crosswalk, filters, rejected/unmapped/ambiguous rows, deduplication and orientation; compare candidate-only/canonical-only/intersection against the frozen canonical generation.",
+      "missing_artifacts": [
+        "release-pinned native constituent and checksum",
+        "accepted crosswalk/quarantine manifest",
+        "original immutable producer",
+        "verified replay and parity/exception report"
+      ],
+      "next_rebuild_card": "t_86299745 \u2014 rebuild all five molecule provenance-gap lineages after parent merge",
+      "preferred_sources": [
+        "TxData/TxGNN Dataverse combination-screen constituent(s)"
+      ],
+      "raw_objects": [],
+      "relation": "molecule_synergizes_molecule",
+      "release_version": "Exact accepted constituent file/release not yet pinned; Dataverse bundle DOI is known.",
+      "x_type": "molecule",
+      "y_type": "molecule"
+    },
+    {
+      "assertion_policy": "source-native ChEMBL molecule mechanism to target protein component; no molecule-to-gene projection",
+      "availability_statuses": [
+        "remote-refetch-required",
+        "historical-builder-recoverable"
+      ],
+      "builder_status": "current builder present; add release/checksum manifest before replay claim",
+      "direct": true,
+      "evidence_fields": [
+        "source",
+        "source_dataset",
+        "source_release",
+        "source_record_id",
+        "original_endpoint_ids",
+        "mapping_method",
+        "mapping_confidence",
+        "license",
+        "mec_id",
+        "action_type",
+        "mechanism",
+        "target_chembl_id",
+        "target_uniprot_id",
+        "direct_interaction",
+        "pmid"
+      ],
+      "execution_placement": "bounded fixture/source audit on Mac; full or bulk build on txgnn-worker; task-scoped staging only",
+      "historical_identity": "t_15e780b9: 2,119 edges / 2,132 evidence; manage_db/build_chembl_molecule_targets_protein.py at ad0c2e3de8522025fc0f2d6a3f76caa0658d0e39.",
+      "kind": "pharmacological",
+      "license_access": "ChEMBL terms/license must be recorded with the pinned payload.",
+      "mapping_rejection_policy": "Canonical ChEMBL molecule ID plus human protein target component; exact unambiguous UniProt-to-protein; reject missing molecules/targets, nonhuman, nonprotein, unmapped and ambiguous rows.",
+      "missing_artifacts": [],
+      "next_rebuild_card": "create a relation-specific producer card after this contract is reviewed and merged",
+      "preferred_sources": [
+        "ChEMBL mechanism API plus target protein components"
+      ],
+      "raw_objects": [],
+      "relation": "molecule_targets_protein",
+      "release_version": "Historical label ChEMBL API 2026-06-23; immutable API payload checksums must be recreated.",
+      "x_type": "molecule",
+      "y_type": "protein"
+    },
+    {
+      "assertion_policy": "positive indication/treatment assertion; original edge lineage remains separate from later support",
+      "availability_statuses": [
+        "remote-refetch-required",
+        "source-selection-required"
+      ],
+      "builder_status": "original accepted builder/commit not recovered",
+      "direct": false,
+      "evidence_fields": [
+        "source",
+        "source_dataset",
+        "source_release",
+        "source_record_id",
+        "original_endpoint_ids",
+        "mapping_method",
+        "mapping_confidence",
+        "license",
+        "source_predicate",
+        "score",
+        "threshold",
+        "assay",
+        "biological_context",
+        "pair_orientation"
+      ],
+      "execution_placement": "bounded fixture/source audit on Mac; full or bulk build on txgnn-worker; task-scoped staging only",
+      "historical_identity": "Current flat canonical object identity is frozen in relation-evidence-ledger.json; migration proves byte movement, not source replay.",
+      "kind": "pharmacological",
+      "license_access": "Verify the selected Dataverse constituent license and redistribution terms before fetch/build.",
+      "mapping_rejection_policy": "Recover exact molecule/partner crosswalk, filters, rejected/unmapped/ambiguous rows, deduplication and orientation; compare candidate-only/canonical-only/intersection against the frozen canonical generation.",
+      "missing_artifacts": [
+        "release-pinned native constituent and checksum",
+        "accepted crosswalk/quarantine manifest",
+        "original immutable producer",
+        "verified replay and parity/exception report"
+      ],
+      "next_rebuild_card": "t_86299745 \u2014 rebuild all five molecule provenance-gap lineages after parent merge",
+      "preferred_sources": [
+        "original TxData/TxGNN Dataverse indication constituent; later OpenTargets/ClinicalTrials evidence is support only"
+      ],
+      "raw_objects": [],
+      "relation": "molecule_treats_disease",
+      "release_version": "Exact accepted constituent file/release not yet pinned; Dataverse bundle DOI is known.",
+      "x_type": "molecule",
+      "y_type": "disease"
+    },
+    {
+      "assertion_policy": "accepted structural/reference membership exception; no row-level evidence table is required or desired",
+      "availability_statuses": [
+        "accepted-no-row-evidence"
+      ],
+      "builder_status": "manage_db/export_human_organism_slice.py constructs the structural reference edge",
+      "direct": true,
+      "evidence_fields": [
+        "table_source",
+        "taxonomy_release",
+        "gene_registry_release",
+        "builder_commit",
+        "edge_generation",
+        "row_count",
+        "endpoint_antijoin_count"
+      ],
+      "execution_placement": "bounded fixture locally; any full registry rebuild on txgnn-worker; no fabricated evidence parquet",
+      "historical_identity": "Canonical flat object: 109,325 rows; generation 1785155488582377 (see relation-evidence-ledger.json).",
+      "kind": "genetic",
+      "license_access": "Record the taxonomy/gene-registry source licenses at table level.",
+      "mapping_rejection_policy": "Bind the organism ID and exact accepted gene registry/release; exclude nonhuman/orthology stubs according to the reviewed human-gene policy; report table-level counts and anti-joins.",
+      "missing_artifacts": [],
+      "next_rebuild_card": "no evidence-backfill card; table-level source/release documentation only",
+      "preferred_sources": [
+        "current human organism slice plus release-pinned canonical gene registry membership"
+      ],
+      "raw_objects": [],
+      "relation": "organism_has_gene",
+      "release_version": "Table-level provenance must bind organism taxonomy identity and the accepted canonical gene registry snapshot.",
+      "x_type": "organism",
+      "y_type": "gene"
+    },
+    {
+      "assertion_policy": "metadata/provenance only; keep disconnected from default biomedical training adjacency",
+      "availability_statuses": [
+        "source-selection-required"
+      ],
+      "builder_status": "source-specific builder required",
+      "direct": true,
+      "evidence_fields": [
+        "source",
+        "source_dataset",
+        "source_release",
+        "source_record_id",
+        "original_endpoint_ids",
+        "mapping_method",
+        "mapping_confidence",
+        "license"
+      ],
+      "execution_placement": "bounded metadata build locally or on worker by size; graph-disconnected output only",
+      "historical_identity": "No accepted immutable historical producer/artifact identity recovered.",
+      "kind": "literature",
+      "license_access": "Source-specific metadata license required.",
+      "mapping_rejection_policy": "Require stable catalog identifiers and exact typed members; reject unresolved aliases and never infer membership from graph proximity.",
+      "missing_artifacts": [],
+      "next_rebuild_card": "create a relation-specific producer card after this contract is reviewed and merged",
+      "preferred_sources": [
+        "release-pinned provenance/catalog registry selected by a future metadata card"
+      ],
+      "raw_objects": [],
+      "relation": "paper_cites_paper",
+      "release_version": "No accepted source release selected.",
+      "x_type": "paper",
+      "y_type": "paper"
+    },
+    {
+      "assertion_policy": "metadata/provenance only; keep disconnected from default biomedical training adjacency",
+      "availability_statuses": [
+        "source-selection-required"
+      ],
+      "builder_status": "source-specific builder required",
+      "direct": true,
+      "evidence_fields": [
+        "source",
+        "source_dataset",
+        "source_release",
+        "source_record_id",
+        "original_endpoint_ids",
+        "mapping_method",
+        "mapping_confidence",
+        "license"
+      ],
+      "execution_placement": "bounded metadata build locally or on worker by size; graph-disconnected output only",
+      "historical_identity": "No accepted immutable historical producer/artifact identity recovered.",
+      "kind": "metadata",
+      "license_access": "Source-specific metadata license required.",
+      "mapping_rejection_policy": "Require stable catalog identifiers and exact typed members; reject unresolved aliases and never infer membership from graph proximity.",
+      "missing_artifacts": [],
+      "next_rebuild_card": "create a relation-specific producer card after this contract is reviewed and merged",
+      "preferred_sources": [
+        "release-pinned provenance/catalog registry selected by a future metadata card"
+      ],
+      "raw_objects": [],
+      "relation": "paper_produced_dataset",
+      "release_version": "No accepted source release selected.",
+      "x_type": "paper",
+      "y_type": "dataset"
+    },
+    {
+      "assertion_policy": "Reactome all-level pathway membership from source-native UniProt endpoints; pathway-to-protein",
+      "availability_statuses": [
+        "current-raw-available",
+        "historical-builder-recoverable"
+      ],
+      "builder_status": "current builder and fixture tests present; update acquisition to require pinned checksum rather than mutable current URL",
+      "direct": false,
+      "evidence_fields": [
+        "source",
+        "source_dataset",
+        "source_release",
+        "source_record_id",
+        "original_endpoint_ids",
+        "mapping_method",
+        "mapping_confidence",
+        "license",
+        "membership_type",
+        "reactome_evidence_code",
+        "source_pathway_id",
+        "source_protein_id",
+        "species"
+      ],
+      "execution_placement": "bounded fixture/source audit on Mac; full or bulk build on txgnn-worker; task-scoped staging only",
+      "historical_identity": "t_15e780b9: 15,436 edges / 18,068 evidence; current builder manage_db/build_reactome_pathway_protein_membership.py at 12b9cde2af02fd1aae774a6a8b0f3059814e26e9.",
+      "kind": "pathway",
+      "license_access": "Reactome license requires re-review before promotion.",
+      "mapping_rejection_policy": "Human R-HSA only; exact pathway node; exact unambiguous UniProt-to-protein; reject missing pathway, unmapped and ambiguous UniProt; no gene projection.",
+      "missing_artifacts": [],
+      "next_rebuild_card": "create a relation-specific producer card after this contract is reviewed and merged",
+      "preferred_sources": [
+        "Reactome UniProt2Reactome_All_Levels"
+      ],
+      "raw_objects": [
+        {
+          "crc32c_base64": "y0X/Og==",
+          "generation": "1785155500806613",
+          "size": 116822208,
+          "uri": "gs://jouvencekb/raw/reactome_UniProt2Reactome_All_Levels_20260323.txt"
+        }
+      ],
+      "relation": "pathway_contains_protein",
+      "release_version": "2026-03-23 (historical Last-Modified)",
+      "x_type": "pathway",
+      "y_type": "protein"
+    },
+    {
+      "assertion_policy": "direct observation only; HPOA disease-to-phenotype plus anatomy is forbidden",
+      "availability_statuses": [
+        "source-selection-required",
+        "remote-refetch-required"
+      ],
+      "builder_status": "source-specific builder required",
+      "direct": true,
+      "evidence_fields": [
+        "source",
+        "source_dataset",
+        "source_release",
+        "source_record_id",
+        "original_endpoint_ids",
+        "mapping_method",
+        "mapping_confidence",
+        "license",
+        "context",
+        "assay_or_method",
+        "score",
+        "effect_size",
+        "p_value",
+        "q_value",
+        "sample_count",
+        "threshold_policy"
+      ],
+      "execution_placement": "bounded fixture/source audit on Mac; full or bulk build on txgnn-worker; task-scoped staging only",
+      "historical_identity": "No accepted immutable historical producer/artifact identity recovered.",
+      "kind": "phenotype_assoc",
+      "license_access": "Source-specific license/access review required.",
+      "mapping_rejection_policy": "Require exact typed endpoint mapping and preserve all context/statistics; quarantine ambiguous/unmapped rows; never derive from adjacent KG paths.",
+      "missing_artifacts": [],
+      "next_rebuild_card": "create a relation-specific producer card after this contract is reviewed and merged",
+      "preferred_sources": [
+        "direct tissue-to-phenotype observation source"
+      ],
+      "raw_objects": [],
+      "relation": "phenotype_observed_in_tissue",
+      "release_version": "No release-pinned accepted source selected.",
+      "x_type": "tissue",
+      "y_type": "phenotype"
+    },
+    {
+      "assertion_policy": "active edges require observed ChIP-like binding to an accepted enhancer; CRM is reconstructed support; motif-only rows never create active edges",
+      "availability_statuses": [
+        "historical-builder-recoverable",
+        "remote-refetch-required"
+      ],
+      "builder_status": "historical staged builder is recoverable from Git/card artifacts; refactor to current flat paths",
+      "direct": true,
+      "evidence_fields": [
+        "source",
+        "source_dataset",
+        "source_release",
+        "source_record_id",
+        "original_endpoint_ids",
+        "mapping_method",
+        "mapping_confidence",
+        "license",
+        "evidence_type",
+        "assay",
+        "biosample",
+        "genome_build",
+        "peak_coordinates",
+        "overlap_rule",
+        "score",
+        "q_value"
+      ],
+      "execution_placement": "bounded fixture/source audit on Mac; full or bulk build on txgnn-worker; task-scoped staging only",
+      "historical_identity": "t_a405fe3b (reviewer t_95856c15): 1,224,536 staged edges / 6,356,561 evidence; t_656a1102 and t_f2a2952e are CRM sidecar lanes, not final topology.",
+      "kind": "regulatory",
+      "license_access": "ReMap/JASPAR/HOCOMOCO terms must be recorded per fetched release.",
+      "mapping_rejection_policy": "Harmonize genome build; map TF and enhancer endpoints explicitly; retain peak-to-enhancer overlap rule, biosample and source peak; reject motif-only and incompatible coordinates.",
+      "missing_artifacts": [],
+      "next_rebuild_card": "create a relation-specific producer card after this contract is reviewed and merged",
+      "preferred_sources": [
+        "ReMap observed all-peak ChIP binding",
+        "ReMap CRM reconstructed support",
+        "JASPAR/HOCOMOCO motif support only"
+      ],
+      "raw_objects": [],
+      "relation": "tf_binds_enhancer",
+      "release_version": "Historical bounded pilot t_a405fe3b; exact source release/input identities must be refrozen for reprise.",
+      "x_type": "gene",
+      "y_type": "enhancer"
+    },
+    {
+      "assertion_policy": "not an observed direct relation; only a context-qualified inferred product of reviewed operands with full derivation evidence; keep observed tables separate",
+      "availability_statuses": [
+        "source-selection-required"
+      ],
+      "builder_status": "source-specific builder required",
+      "direct": true,
+      "evidence_fields": [
+        "source",
+        "source_dataset",
+        "source_release",
+        "source_record_id",
+        "original_endpoint_ids",
+        "mapping_method",
+        "mapping_confidence",
+        "license",
+        "derivation_rule_version",
+        "binding_evidence_id",
+        "enhancer_gene_evidence_id",
+        "full_path",
+        "context_compatibility"
+      ],
+      "execution_placement": "bounded derivation tests locally; full derivation on txgnn-worker into edges_inferred/evidence_inferred only",
+      "historical_identity": "No accepted immutable historical producer/artifact identity recovered.",
+      "kind": "regulatory",
+      "license_access": "Inherited source licenses must remain attached to every derivation operand.",
+      "mapping_rejection_policy": "Require exact enhancer identity and compatible biosample/context; reject missing, conflicting or pooled-incomparable contexts and all nearest-gene shortcuts.",
+      "missing_artifacts": [],
+      "next_rebuild_card": "create a relation-specific producer card after this contract is reviewed and merged",
+      "preferred_sources": [
+        "derived only: reviewed tf_binds_enhancer plus compatible-context enhancer_regulates_gene"
+      ],
+      "raw_objects": [],
+      "relation": "tf_regulates_gene",
+      "release_version": "No observed/source-native table is approved.",
+      "x_type": "gene",
+      "y_type": "gene"
+    },
+    {
+      "assertion_policy": "retain every existing edge whose native expression is non-zero; preserve numeric expression and add deterministic low|medium|high bins",
+      "availability_statuses": [
+        "source-selection-required"
+      ],
+      "builder_status": "feature/evidence enrichment builder required; canonical edge deletion is out of scope",
+      "direct": true,
+      "evidence_fields": [
+        "source",
+        "source_dataset",
+        "source_release",
+        "source_record_id",
+        "original_endpoint_ids",
+        "mapping_method",
+        "mapping_confidence",
+        "license",
+        "numeric_expression",
+        "unit",
+        "modality",
+        "context_group",
+        "quantile_grouping_columns",
+        "q_low_cutoff",
+        "q_high_cutoff",
+        "expression_bin"
+      ],
+      "execution_placement": "bounded fixture/source audit on Mac; full or bulk build on txgnn-worker; task-scoped staging only",
+      "historical_identity": "Current flat edge generation is frozen in relation-evidence-ledger.json; numeric expression is not present in edge-only topology.",
+      "kind": "expression",
+      "license_access": "Inherit and record the native expression source license.",
+      "mapping_rejection_policy": "Quantiles must be computed within an explicitly recorded source/context/modality group; record exact grouping and q cutoffs; never pool incomparable modalities; quarantine rows lacking a comparable group or typed endpoint.",
+      "missing_artifacts": [],
+      "next_rebuild_card": "create a relation-specific producer card after this contract is reviewed and merged",
+      "preferred_sources": [
+        "the release-pinned native expression source that produced the retained canonical table"
+      ],
+      "raw_objects": [],
+      "relation": "tissue_expresses_gene",
+      "release_version": "Table exists canonically; exact accepted source/release and numeric payload must be recovered before enrichment.",
+      "x_type": "tissue",
+      "y_type": "gene"
+    },
+    {
+      "assertion_policy": "source-native transcript/RNA-to-gene mechanism with perturbation, direction or effect; never mature-miRNA targets, ceRNA, correlation or projected RBP binding",
+      "availability_statuses": [
+        "source-selection-required",
+        "remote-refetch-required"
+      ],
+      "builder_status": "source-specific builder required",
+      "direct": false,
+      "evidence_fields": [
+        "source",
+        "source_dataset",
+        "source_release",
+        "source_record_id",
+        "original_endpoint_ids",
+        "mapping_method",
+        "mapping_confidence",
+        "license",
+        "rna_class",
+        "mechanism",
+        "perturbation",
+        "direction",
+        "effect",
+        "assay",
+        "context",
+        "pmid"
+      ],
+      "execution_placement": "bounded fixture/source audit on Mac; full or bulk build on txgnn-worker; task-scoped staging only",
+      "historical_identity": "No accepted immutable historical producer/artifact identity recovered.",
+      "kind": "regulatory",
+      "license_access": "Source-specific access/redistribution review required; LncRNA2Target access previously timed out.",
+      "mapping_rejection_policy": "Require ENST/approved transcript mapping and canonical gene mapping; quarantine subtype-specific RNA IDs and all ambiguous/unmapped endpoints.",
+      "missing_artifacts": [],
+      "next_rebuild_card": "create a relation-specific producer card after this contract is reviewed and merged",
+      "preferred_sources": [
+        "LncRNA2Target",
+        "LncTarD",
+        "narrow NPInter/RNAInter direct mechanism rows"
+      ],
+      "raw_objects": [],
+      "relation": "transcript_interacts_gene",
+      "release_version": "No accepted endpoint-valid release selected; t_e76149bc found zero active generic candidates in audited NPInter/RNAInter exports.",
+      "x_type": "transcript",
+      "y_type": "gene"
+    },
+    {
+      "assertion_policy": "physical source-native RNA/transcript-protein binding only; predictions/motifs/context remain sidecars",
+      "availability_statuses": [
+        "remote-refetch-required",
+        "historical-builder-recoverable"
+      ],
+      "builder_status": "audit code/history recoverable; active builder blocked on transcript/protein endpoint mapping",
+      "direct": true,
+      "evidence_fields": [
+        "source",
+        "source_dataset",
+        "source_release",
+        "source_record_id",
+        "original_endpoint_ids",
+        "mapping_method",
+        "mapping_confidence",
+        "license",
+        "rna_class",
+        "assay",
+        "clip_method",
+        "coordinates",
+        "biosample",
+        "experimental_status",
+        "pmid"
+      ],
+      "execution_placement": "bounded fixture/source audit on Mac; full or bulk build on txgnn-worker; task-scoped staging only",
+      "historical_identity": "t_e76149bc audited official NPInter/RNAInter exports and found zero policy-valid ENST+protein endpoint rows; no edge artifact was created.",
+      "kind": "physical",
+      "license_access": "NPInter redistribution unclear; RNAInter academic/commercial terms differ; verify POSTAR/ENCORI terms before build.",
+      "mapping_rejection_policy": "Require current ENST or reviewed transcript mapping and source-native UniProt/ENSP or unambiguous protein mapping; reject gene-symbol projection, ncRNA catalog IDs without node mapping, and coordinate-only rows without reviewed mapping.",
+      "missing_artifacts": [],
+      "next_rebuild_card": "create a relation-specific producer card after this contract is reviewed and merged",
+      "preferred_sources": [
+        "POSTAR3/POSTAR lineage",
+        "ENCORI/starBase RBP modules",
+        "NPInter v5 and RNAInter v4 direct experimental subsets"
+      ],
+      "raw_objects": [],
+      "relation": "transcript_interacts_protein",
+      "release_version": "NPInter v5 and RNAInter v4 audited in t_e76149bc; POSTAR/ENCORI exact release still requires pinning.",
+      "x_type": "transcript",
+      "y_type": "protein"
+    }
+  ],
+  "schema_version": "relation-expansion-source-contract-v1",
+  "summary": {
+    "accepted_no_row_evidence": 1,
+    "noncanonical_relations": 24,
+    "provenance_gaps": 5,
+    "relations": 33,
+    "retained_expression_relations": 3
+  }
+}
