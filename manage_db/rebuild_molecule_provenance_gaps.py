@@ -13,13 +13,15 @@ import hashlib
 import json
 import os
 import socket
+import subprocess
+import tempfile
 import time
 import urllib.request
 import uuid
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Iterator
+from typing import Any, Iterator
 
 import pandas as pd
 
@@ -148,6 +150,14 @@ class RunAdmission:
     lock_path: Path
     lease_until: datetime
     max_runtime_seconds: int
+    owner: str
+    lease_id: str
+    gcp_project: str
+    zone: str
+    instance: str
+    instance_id: str
+    absolute_deadline: datetime
+    stop_policy: str
 
 
 def file_md5(path: Path) -> str:
@@ -186,15 +196,24 @@ def _reject_dangerous_path(path: Path, *, label: str) -> Path:
 
 def _validate_output_path(output_dir: Path, *, fixture: bool, fixture_allowed_root: Path | None) -> None:
     resolved_output = _reject_dangerous_path(output_dir, label="output")
+    task_root = (Path.cwd() / "artifacts" / "staged" / "t_86299745").resolve(strict=False)
     if fixture:
         if fixture_allowed_root is None:
             raise ValueError("fixture_allowed_root is required for fixture replay")
         allowed_root = _reject_dangerous_path(fixture_allowed_root, label="fixture root")
+        pytest_temp = Path(tempfile.gettempdir()).resolve(strict=False)
+        pytest_capability = (
+            bool(os.environ.get("PYTEST_CURRENT_TEST"))
+            and allowed_root != pytest_temp
+            and allowed_root.is_relative_to(pytest_temp)
+            and allowed_root.name.startswith("test_")
+        )
+        if allowed_root != task_root and not pytest_capability:
+            raise ValueError("fixture_allowed_root is not an approved task/pytest root")
         if resolved_output == allowed_root or not resolved_output.is_relative_to(allowed_root):
             raise ValueError("fixture output must be a child of fixture_allowed_root")
         return
-    allowed_root = (Path.cwd() / "artifacts" / "staged" / "t_86299745").resolve(strict=False)
-    if not resolved_output.is_relative_to(allowed_root) or resolved_output == allowed_root:
+    if not resolved_output.is_relative_to(task_root) or resolved_output == task_root:
         raise ValueError("full replay output must be under artifacts/staged/t_86299745/")
 
 
@@ -208,14 +227,58 @@ def _parse_timestamp(value: object, field: str) -> datetime:
     return parsed.astimezone(UTC)
 
 
+def _live_instance_readback(project: str, zone: str, instance: str) -> dict[str, Any]:
+    completed = subprocess.run(
+        [
+            "gcloud", "compute", "instances", "describe", instance,
+            f"--project={project}", f"--zone={zone}", "--format=json",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    return json.loads(completed.stdout)
+
+
+def _validate_live_admission(admission: RunAdmission, *, cleanup_margin_seconds: int) -> datetime:
+    live = _live_instance_readback(admission.gcp_project, admission.zone, admission.instance)
+    labels = live.get("labels") or {}
+    identity = {
+        "owner": admission.owner,
+        "project": "jouvence",
+        "purpose": "molecule-provenance-gap-full-replay",
+        "task": "t-86299745",
+        "lease-id": admission.lease_id,
+        "absolute-until": str(int(admission.absolute_deadline.timestamp())),
+    }
+    if str(live.get("id")) != admission.instance_id or live.get("status") != "RUNNING":
+        raise ValueError("live worker identity/state readback failed")
+    for field, value in identity.items():
+        if labels.get(field) != value:
+            raise ValueError(f"live worker lease readback mismatch: {field}")
+    policies = {
+        str(value).rstrip("/").rsplit("/", 1)[-1]
+        for value in live.get("resourcePolicies") or []
+    }
+    if policies != {admission.stop_policy}:
+        raise ValueError("absolute stop policy readback failed")
+    try:
+        live_lease_until = datetime.fromtimestamp(int(labels["lease-until"]), UTC)
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ValueError("live worker lease-until readback is malformed") from exc
+    if live_lease_until < datetime.now(UTC) + timedelta(seconds=cleanup_margin_seconds):
+        raise ValueError("live worker lease is not renewed through cleanup margin")
+    return live_lease_until
+
+
 def validate_launcher_receipt(path: Path) -> RunAdmission:
-    """Validate a fresh readback from the project-approved lifecycle launcher."""
+    """Bind a launcher expected-value packet to fresh live GCE lease readback."""
     if not path.is_file():
         raise ValueError("full replay requires a launcher receipt")
     receipt = json.loads(path.read_text())
     expected = {
         "task_id": "t_86299745",
-        "owner": os.environ.get("USER", "jkobject"),
         "project": "jouvence",
         "purpose": "molecule-provenance-gap-full-replay",
         "hostname": "txgnn-worker",
@@ -223,6 +286,17 @@ def validate_launcher_receipt(path: Path) -> RunAdmission:
     for field, value in expected.items():
         if receipt.get(field) != value:
             raise ValueError(f"launcher receipt {field} must equal {value!r}")
+    owner = str(receipt.get("owner", ""))
+    lease_id = str(receipt.get("lease_id", ""))
+    gcp_project = str(receipt.get("gcp_project_id", ""))
+    zone = str(receipt.get("zone", ""))
+    instance = str(receipt.get("instance", ""))
+    instance_id = str(receipt.get("instance_id", ""))
+    stop_policy = str(receipt.get("absolute_stop_policy", ""))
+    if not all((owner, lease_id, gcp_project, zone, instance, instance_id, stop_policy)):
+        raise ValueError("launcher receipt is missing immutable lease identity")
+    if instance != "txgnn-worker":
+        raise ValueError("launcher receipt instance must equal 'txgnn-worker'")
     now = datetime.now(UTC)
     readback_at = _parse_timestamp(receipt.get("readback_at"), "readback_at")
     lease_until = _parse_timestamp(receipt.get("lease_until"), "lease_until")
@@ -233,13 +307,26 @@ def validate_launcher_receipt(path: Path) -> RunAdmission:
         raise ValueError("launcher receipt max_runtime_seconds must be an integer in [60, 86400]")
     if lease_until.timestamp() < time.time() + max_runtime + 600:
         raise ValueError("launcher lease does not cover max runtime plus cleanup margin")
+    absolute_deadline = _parse_timestamp(receipt.get("absolute_deadline"), "absolute_deadline")
+    if absolute_deadline < lease_until or absolute_deadline > now + timedelta(days=1):
+        raise ValueError("launcher absolute deadline is invalid")
+
     heartbeat = Path(str(receipt.get("payload_heartbeat_path", "")))
     lock = Path(str(receipt.get("resource_lock_path", "")))
     if not heartbeat.is_absolute() or not lock.is_absolute():
         raise ValueError("launcher receipt heartbeat and lock paths must be absolute")
     for candidate in (heartbeat, lock):
         _reject_dangerous_path(candidate, label="runtime")
-    return RunAdmission(path, heartbeat, lock, lease_until, max_runtime)
+    admission = RunAdmission(
+        path, heartbeat, lock, lease_until, max_runtime, owner, lease_id,
+        gcp_project, zone, instance, instance_id, absolute_deadline, stop_policy,
+    )
+    live_lease_until = _validate_live_admission(
+        admission, cleanup_margin_seconds=max_runtime + 600
+    )
+    if abs((live_lease_until - lease_until).total_seconds()) > 1:
+        raise ValueError("launcher receipt lease-until differs from live readback")
+    return admission
 
 
 @contextlib.contextmanager
@@ -267,6 +354,7 @@ def _payload_heartbeat(admission: RunAdmission | None, *, started: float, source
     elapsed = time.monotonic() - started
     if elapsed > admission.max_runtime_seconds or datetime.now(UTC) >= admission.lease_until:
         raise TimeoutError("full replay exceeded its admitted runtime/lease")
+    _validate_live_admission(admission, cleanup_margin_seconds=600)
     admission.heartbeat_path.parent.mkdir(parents=True, exist_ok=True)
     partial = admission.heartbeat_path.with_suffix(".partial")
     partial.write_text(
@@ -307,11 +395,17 @@ def acquire_source(
                 handle.write(chunk)
                 digest.update(chunk)
                 size += len(chunk)
-                _payload_heartbeat(
-                    admission,
-                    started=started if started is not None else time.monotonic(),
-                    source_rows=size,
-                )
+                if size % (64 * 1024 * 1024) < len(chunk):
+                    _payload_heartbeat(
+                        admission,
+                        started=started if started is not None else time.monotonic(),
+                        source_rows=size,
+                    )
+            _payload_heartbeat(
+                admission,
+                started=started if started is not None else time.monotonic(),
+                source_rows=size,
+            )
             handle.flush()
             os.fsync(handle.fileno())
         observed_md5 = digest.hexdigest()

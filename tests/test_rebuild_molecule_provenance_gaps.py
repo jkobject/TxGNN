@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 import pandas as pd
 import pytest
@@ -201,16 +202,18 @@ def test_parity_report_accounts_for_key_sets_endpoints_duplicates_and_later_supp
     }
 
 
-def test_chunked_replay_keeps_globally_unique_source_record_ids(tmp_path) -> None:
+def test_chunked_replay_keeps_globally_unique_source_record_ids(tmp_path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
     source = tmp_path / "kg.csv"
     fixture_rows().iloc[:2].to_csv(source, index=False)
 
-    output = tmp_path / "candidate"
+    allowed_root = tmp_path / "artifacts" / "staged" / "t_86299745"
+    output = allowed_root / "candidate"
     write_replay(
         source,
         output,
         fixture=True,
-        fixture_allowed_root=tmp_path,
+        fixture_allowed_root=allowed_root,
         canonical_dir=None,
         chunksize=1,
     )
@@ -310,7 +313,8 @@ def test_full_replay_refuses_non_worker_and_non_staging_output(tmp_path, monkeyp
         write_replay(source, escape, fixture=False, canonical_dir=canonical, chunksize=2)
 
 
-def test_fixture_replay_requires_explicit_safe_root_and_rejects_canonical_shaped_paths(tmp_path) -> None:
+def test_fixture_replay_requires_explicit_safe_root_and_rejects_canonical_shaped_paths(tmp_path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
     source = tmp_path / "kg.csv"
     fixture_rows().to_csv(source, index=False)
 
@@ -322,6 +326,16 @@ def test_fixture_replay_requires_explicit_safe_root_and_rejects_canonical_shaped
             tmp_path / "main" / "edges" / "unsafe",
             fixture=True,
             fixture_allowed_root=tmp_path,
+            canonical_dir=None,
+            chunksize=2,
+        )
+
+    with pytest.raises(ValueError, match="not an approved task/pytest root"):
+        write_replay(
+            source,
+            Path("/tmp/jouvence-review-unapproved/candidate"),
+            fixture=True,
+            fixture_allowed_root=Path("/"),
             canonical_dir=None,
             chunksize=2,
         )
@@ -351,6 +365,8 @@ def test_full_cli_preflight_runs_before_acquisition(tmp_path, monkeypatch) -> No
 
 def test_launcher_receipt_requires_fresh_bounded_task_lease_and_exclusive_lock(tmp_path, monkeypatch) -> None:
     now = datetime.now(UTC)
+    lease_until = now + timedelta(hours=2)
+    absolute_deadline = now + timedelta(hours=3)
     heartbeat = tmp_path / "runtime" / "heartbeat.json"
     lock = tmp_path / "runtime" / "writer.lock"
     receipt = tmp_path / "launcher-receipt.json"
@@ -363,14 +379,34 @@ def test_launcher_receipt_requires_fresh_bounded_task_lease_and_exclusive_lock(t
                 "purpose": "molecule-provenance-gap-full-replay",
                 "hostname": "txgnn-worker",
                 "readback_at": now.isoformat(),
-                "lease_until": (now + timedelta(hours=2)).isoformat(),
+                "lease_until": lease_until.isoformat(),
+                "absolute_deadline": absolute_deadline.isoformat(),
                 "max_runtime_seconds": 3600,
                 "payload_heartbeat_path": str(heartbeat),
                 "resource_lock_path": str(lock),
+                "lease_id": "lease-12345678",
+                "gcp_project_id": "test-project",
+                "zone": "test-zone",
+                "instance": "txgnn-worker",
+                "instance_id": "1234",
+                "absolute_stop_policy": "stop-policy",
             }
         )
     )
-    monkeypatch.setenv("USER", "tester")
+    monkeypatch.setattr(rebuild, "_live_instance_readback", lambda *args: {
+        "id": "1234",
+        "status": "RUNNING",
+        "labels": {
+            "owner": "tester",
+            "project": "jouvence",
+            "purpose": "molecule-provenance-gap-full-replay",
+            "task": "t-86299745",
+            "lease-id": "lease-12345678",
+            "lease-until": str(int(lease_until.timestamp())),
+            "absolute-until": str(int(absolute_deadline.timestamp())),
+        },
+        "resourcePolicies": ["projects/test/regions/test/resourcePolicies/stop-policy"],
+    })
     admission = validate_launcher_receipt(receipt)
     lock.parent.mkdir(parents=True)
     lock.write_text("existing writer\n")
@@ -383,6 +419,48 @@ def test_launcher_receipt_requires_fresh_bounded_task_lease_and_exclusive_lock(t
     receipt.write_text(json.dumps(receipt_payload))
     with pytest.raises(ValueError, match="not fresh"):
         validate_launcher_receipt(receipt)
+
+
+def test_forged_launcher_receipt_fails_without_matching_live_gce_lease(tmp_path, monkeypatch) -> None:
+    now = datetime.now(UTC)
+    receipt = tmp_path / "forged.json"
+    receipt.write_text(json.dumps({
+        "task_id": "t_86299745", "owner": "attacker", "project": "jouvence",
+        "purpose": "molecule-provenance-gap-full-replay", "hostname": "txgnn-worker",
+        "readback_at": now.isoformat(), "lease_until": (now + timedelta(hours=2)).isoformat(),
+        "absolute_deadline": (now + timedelta(hours=3)).isoformat(), "max_runtime_seconds": 3600,
+        "payload_heartbeat_path": str(tmp_path / "heartbeat"),
+        "resource_lock_path": str(tmp_path / "lock"), "lease_id": "forged-lease",
+        "gcp_project_id": "test-project", "zone": "test-zone", "instance": "txgnn-worker",
+        "instance_id": "1234", "absolute_stop_policy": "forged-policy",
+    }))
+    monkeypatch.setattr(rebuild, "_live_instance_readback", lambda *args: {
+        "id": "1234", "status": "TERMINATED", "labels": {}, "resourcePolicies": []
+    })
+    with pytest.raises(ValueError, match="live worker identity/state"):
+        validate_launcher_receipt(receipt)
+
+
+def test_payload_heartbeat_fails_closed_when_live_lease_renewal_disappears(tmp_path, monkeypatch) -> None:
+    now = datetime.now(UTC)
+    admission = rebuild.RunAdmission(
+        tmp_path / "receipt.json", tmp_path / "heartbeat.json", tmp_path / "lock",
+        now + timedelta(hours=2), 3600, "tester", "lease-12345678", "test-project",
+        "test-zone", "txgnn-worker", "1234", now + timedelta(hours=3), "stop-policy",
+    )
+    monkeypatch.setattr(rebuild, "_live_instance_readback", lambda *args: {
+        "id": "1234", "status": "RUNNING",
+        "labels": {
+            "owner": "tester", "project": "jouvence",
+            "purpose": "molecule-provenance-gap-full-replay", "task": "t-86299745",
+            "lease-id": "lease-12345678", "lease-until": str(int((now + timedelta(minutes=1)).timestamp())),
+            "absolute-until": str(int((now + timedelta(hours=3)).timestamp())),
+        },
+        "resourcePolicies": ["projects/test/regions/test/resourcePolicies/stop-policy"],
+    })
+    with pytest.raises(ValueError, match="not renewed"):
+        rebuild._payload_heartbeat(admission, started=__import__("time").monotonic(), source_rows=1)
+    assert not admission.heartbeat_path.exists()
 
 
 def test_parity_requires_a_snapshot_manifest_with_frozen_edge_generations(tmp_path) -> None:
